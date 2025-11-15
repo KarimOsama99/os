@@ -5,7 +5,8 @@
 # asks Y/N per script with a default value.
 # ==========================================
 
-set -e  # stop on error
+# NOTE: Don't use 'set -e' here as it causes issues with arithmetic operations
+# set -e  # REMOVED - causing script to stop
 
 # --- Colors ---
 GREEN="\e[32m"
@@ -24,16 +25,20 @@ LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/installation_$(date +%Y%m%d_%H%M%S).log"
 
 # Create logs directory
-mkdir -p "$LOG_DIR"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 # --- Command line arguments ---
-AUTO_YES=false
+MODE="manual"  # Default mode: manual (ask for each script)
 SKIP_LIST=()
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -y|--yes)
-            AUTO_YES=true
+        -y|--yes|--auto)
+            MODE="auto"
+            shift
+            ;;
+        -m|--manual)
+            MODE="manual"
             shift
             ;;
         --skip)
@@ -41,20 +46,27 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -h|--help)
+            echo -e "${CYAN}${BOLD}WOLF OS Installation Script${RESET}"
+            echo ""
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -y, --yes          Auto-accept all scripts (skip prompts)"
+            echo "  -m, --manual       Manual mode: Ask for confirmation for each script (default)"
+            echo "  -y, --yes, --auto  Auto mode: Install all scripts with default 'Y' without asking"
             echo "  --skip <script>    Skip specific script"
             echo "  -h, --help         Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0 --yes                          # Install everything"
-            echo "  $0 --skip installSecurityTools.sh # Skip security tools"
+            echo "  $0                                    # Manual mode (ask for each)"
+            echo "  $0 --manual                           # Same as above"
+            echo "  $0 --auto                             # Auto install everything"
+            echo "  $0 --yes                              # Same as --auto"
+            echo "  $0 --skip installSecurityTools.sh     # Skip security tools"
+            echo "  $0 --auto --skip installApps.sh       # Auto but skip apps"
             exit 0
             ;;
         *)
-            echo "Unknown option: $1"
+            echo -e "${RED}Unknown option: $1${RESET}"
             echo "Use --help for usage information"
             exit 1
             ;;
@@ -63,7 +75,9 @@ done
 
 # --- Logging function ---
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+    local msg="[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+    echo "$msg"
+    echo "$msg" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 # --- Ordered list: "script|description|default"
@@ -129,11 +143,23 @@ echo -e "${CYAN}${BOLD}═══════════════════
 echo -e "${BLUE}📁 Script Directory: ${BOLD}${SCRIPT_DIR}${RESET}"
 echo -e "${BLUE}📝 Log File: ${BOLD}${LOG_FILE}${RESET}"
 echo -e "${BLUE}📊 Total Scripts: ${BOLD}${TOTAL_SCRIPTS}${RESET}"
+
+# Display current mode
+if [ "$MODE" = "auto" ]; then
+    echo -e "${GREEN}🤖 Mode: ${BOLD}AUTO${RESET} ${GREEN}(Installing all with defaults)${RESET}"
+else
+    echo -e "${YELLOW}👤 Mode: ${BOLD}MANUAL${RESET} ${YELLOW}(Asking for confirmation)${RESET}"
+fi
+
 echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════════════════${RESET}\n"
 
 log "=== WOLF OS Installation started ==="
+log "Mode: $MODE"
 log "Script directory: $SCRIPT_DIR"
 log "Total scripts: $TOTAL_SCRIPTS"
+
+# Add a small delay to ensure log is written
+sleep 0.5
 
 # --- Main loop ---
 for ENTRY in "${SCRIPTS[@]}"; do
@@ -143,7 +169,7 @@ for ENTRY in "${SCRIPTS[@]}"; do
     DEFAULT="${REST##*|}"             # last part
     SCRIPT_PATH="$SCRIPTS_DIR/$SCRIPT"
     
-    ((CURRENT_SCRIPT++))
+    CURRENT_SCRIPT=$((CURRENT_SCRIPT + 1))
     
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo -e "${YELLOW}${BOLD}▶ [$CURRENT_SCRIPT/$TOTAL_SCRIPTS] ${SCRIPT}${RESET}"
@@ -162,7 +188,7 @@ for ENTRY in "${SCRIPTS[@]}"; do
         echo -e "${YELLOW}   ⚠  Skipped (--skip flag)${RESET}\n"
         log "SKIP: $SCRIPT (via --skip flag)"
         SKIPPED_SCRIPTS+=("$SCRIPT")
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
         continue
     fi
 
@@ -170,23 +196,29 @@ for ENTRY in "${SCRIPTS[@]}"; do
         echo -e "${RED}   ✖ Script not found: $SCRIPT_PATH${RESET}\n"
         log "ERROR: Script not found - $SCRIPT_PATH"
         FAILED_SCRIPTS+=("$SCRIPT (not found)")
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         continue
     fi
 
     # Normalize default (Y/N)
     DEFAULT=${DEFAULT^^}
     
-    # Auto-yes mode or prompt user
-    if [ "$AUTO_YES" = true ]; then
-        ANSWER="Y"
-        echo -e "${GREEN}   ✓ Auto-running (--yes mode)${RESET}"
+    # Determine answer based on mode
+    if [ "$MODE" = "auto" ]; then
+        # Auto mode: use default without asking
+        ANSWER="$DEFAULT"
+        if [ "$DEFAULT" = "Y" ]; then
+            echo -e "${GREEN}   ✓ Auto-running (default: Yes)${RESET}"
+        else
+            echo -e "${YELLOW}   ⊘ Auto-skipping (default: No)${RESET}"
+        fi
     else
+        # Manual mode: ask user
         PROMPT="   ➤ Run this script? (y/N): "
         [ "$DEFAULT" == "Y" ] && PROMPT="   ➤ Run this script? (Y/n): "
         
-        read -rp "$PROMPT" ANSWER
-        ANSWER=${ANSWER:-$DEFAULT}  # use default if empty
+        read -rp "$PROMPT" USER_INPUT
+        ANSWER=${USER_INPUT:-$DEFAULT}  # use default if empty
     fi
     
     echo
@@ -198,15 +230,18 @@ for ENTRY in "${SCRIPTS[@]}"; do
             
             START_TIME=$(date +%s)
             
-            # Run script and capture output
-            if bash "$SCRIPT_PATH" 2>&1 | tee -a "$LOG_FILE"; then
+            # Run script with output redirection
+            if bash "$SCRIPT_PATH" 2>&1 | while IFS= read -r line; do
+                echo "$line"
+                echo "$line" >> "$LOG_FILE" 2>/dev/null || true
+            done; then
                 END_TIME=$(date +%s)
                 ELAPSED=$((END_TIME - START_TIME))
                 
                 echo -e "${GREEN}   ✅ Done: $SCRIPT (${ELAPSED}s)${RESET}\n"
                 log "SUCCESS: $SCRIPT (${ELAPSED}s)"
                 SUCCESS_SCRIPTS+=("$SCRIPT")
-                ((SUCCESSFUL++))
+                SUCCESSFUL=$((SUCCESSFUL + 1))
             else
                 END_TIME=$(date +%s)
                 ELAPSED=$((END_TIME - START_TIME))
@@ -214,24 +249,26 @@ for ENTRY in "${SCRIPTS[@]}"; do
                 echo -e "${RED}   ✖ Failed: $SCRIPT (${ELAPSED}s)${RESET}\n"
                 log "FAILED: $SCRIPT (${ELAPSED}s)"
                 FAILED_SCRIPTS+=("$SCRIPT")
-                ((FAILED++))
+                FAILED=$((FAILED + 1))
                 
-                # Ask if user wants to continue
-                if [ "$AUTO_YES" != true ]; then
+                # Ask if user wants to continue (only in manual mode)
+                if [ "$MODE" = "manual" ]; then
                     read -rp "Continue with remaining scripts? (Y/n): " CONTINUE
                     if [[ $CONTINUE =~ ^[Nn]$ ]]; then
                         echo -e "${RED}Installation aborted by user${RESET}"
                         log "Installation aborted by user after $SCRIPT failed"
                         exit 1
                     fi
+                else
+                    echo -e "${YELLOW}   ⚠  Continuing in auto mode...${RESET}\n"
                 fi
             fi
             ;;
         *)
             echo -e "${YELLOW}   ⚠  Skipped: $SCRIPT${RESET}\n"
-            log "SKIP: $SCRIPT (user choice)"
+            log "SKIP: $SCRIPT (user choice or default)"
             SKIPPED_SCRIPTS+=("$SCRIPT")
-            ((SKIPPED++))
+            SKIPPED=$((SKIPPED + 1))
             ;;
     esac
 done
