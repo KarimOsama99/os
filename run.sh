@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 # ==========================================
-# 🧩  Ordered Script Runner (Enhanced)
-# Runs setup scripts in the order you define,
-# asks Y/N per script with a default value.
+# 🐺  WOLF OS Setup Script
+# Desktop Environment Agnostic Setup
+# Works on any Debian/Ubuntu with existing DE
 # ==========================================
-
-# NOTE: Don't use 'set -e' here as it causes issues with arithmetic operations
-# set -e  # REMOVED - causing script to stop
 
 # --- Colors ---
 GREEN="\e[32m"
@@ -28,7 +25,7 @@ LOG_FILE="$LOG_DIR/installation_$(date +%Y%m%d_%H%M%S).log"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 # --- Command line arguments ---
-MODE="manual"  # Default mode: manual (ask for each script)
+MODE="manual"
 SKIP_LIST=()
 
 while [[ $# -gt 0 ]]; do
@@ -57,12 +54,9 @@ while [[ $# -gt 0 ]]; do
             echo "  -h, --help         Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0                                    # Manual mode (ask for each)"
-            echo "  $0 --manual                           # Same as above"
+            echo "  $0                                    # Manual mode"
             echo "  $0 --auto                             # Auto install everything"
-            echo "  $0 --yes                              # Same as --auto"
             echo "  $0 --skip installSecurityTools.sh     # Skip security tools"
-            echo "  $0 --auto --skip installApps.sh       # Auto but skip apps"
             exit 0
             ;;
         *)
@@ -82,20 +76,19 @@ log() {
 
 # --- Ordered list: "script|description|default"
 SCRIPTS=(
-    "swayInstall.sh|Install base system packages and tools|Y"
-    "swayConfig.sh|Configure Sway window manager and related settings|Y"
-    "installFirefox.sh|Install Firefox|Y"
-    "installApps.sh|Install additional applications (Browsers, IDE, etc)|Y"
+    "systemUpdate.sh|Update system and install base tools|Y"
+    "installWallpapers.sh|Install WOLF OS wallpapers|Y"
+    "installFirefox.sh|Install Firefox browser|Y"
+    "installApps.sh|Install applications (Browsers, IDE, Media, etc)|Y"
     "installSecurityTools.sh|Install security & penetration testing tools|N"
-    "installFonts.sh|Install system fonts|Y"
-    "updateConfig.sh|Copy and update .config|Y"
-    "bashrc.sh|Update bashrc|Y"
-    "installThemes.sh|Install GRUB and Plymouth themes|Y"
-    "catppuccinGTK.sh|Install Catppuccin GTK|Y"
-    "catppuccinQT.sh|Install Catppuccin QT|Y"
-    "bibataCursor.sh|Install Bibata Cursors|Y"
-    "addUserToGroups.sh|Add your user to the needed groups|Y"
-    "chromeWaylandFix.sh|Apply a fix for Chrome on Wayland for older systems|N"
+    "installFonts.sh|Install system fonts (Arabic + English)|Y"
+    "installPlymouth.sh|Install and configure Plymouth boot theme|Y"
+    "installGrubTheme.sh|Install and configure GRUB theme|Y"
+    "catppuccinGTK.sh|Install Catppuccin GTK theme|Y"
+    "catppuccinQT.sh|Install Catppuccin QT theme|Y"
+    "bibataCursor.sh|Install Bibata cursor theme|Y"
+    "bashrc.sh|Configure bashrc with aliases|Y"
+    "finalSetup.sh|Final system configuration and cleanup|Y"
 )
 
 # --- Statistics ---
@@ -144,7 +137,6 @@ echo -e "${BLUE}📁 Script Directory: ${BOLD}${SCRIPT_DIR}${RESET}"
 echo -e "${BLUE}📝 Log File: ${BOLD}${LOG_FILE}${RESET}"
 echo -e "${BLUE}📊 Total Scripts: ${BOLD}${TOTAL_SCRIPTS}${RESET}"
 
-# Display current mode
 if [ "$MODE" = "auto" ]; then
     echo -e "${GREEN}🤖 Mode: ${BOLD}AUTO${RESET} ${GREEN}(Installing all with defaults)${RESET}"
 else
@@ -158,15 +150,14 @@ log "Mode: $MODE"
 log "Script directory: $SCRIPT_DIR"
 log "Total scripts: $TOTAL_SCRIPTS"
 
-# Add a small delay to ensure log is written
 sleep 0.5
 
 # --- Main loop ---
 for ENTRY in "${SCRIPTS[@]}"; do
-    SCRIPT="${ENTRY%%|*}"             # part before first |
+    SCRIPT="${ENTRY%%|*}"
     REST="${ENTRY#*|}"
-    DESC="${REST%%|*}"                # middle part
-    DEFAULT="${REST##*|}"             # last part
+    DESC="${REST%%|*}"
+    DEFAULT="${REST##*|}"
     SCRIPT_PATH="$SCRIPTS_DIR/$SCRIPT"
     
     CURRENT_SCRIPT=$((CURRENT_SCRIPT + 1))
@@ -175,7 +166,6 @@ for ENTRY in "${SCRIPTS[@]}"; do
     echo -e "${YELLOW}${BOLD}▶ [$CURRENT_SCRIPT/$TOTAL_SCRIPTS] ${SCRIPT}${RESET}"
     echo -e "   ${BLUE}${DESC}${RESET}"
     
-    # Check if script should be skipped
     SHOULD_SKIP=false
     for skip_item in "${SKIP_LIST[@]}"; do
         if [[ "$SCRIPT" == "$skip_item" ]]; then
@@ -200,12 +190,9 @@ for ENTRY in "${SCRIPTS[@]}"; do
         continue
     fi
 
-    # Normalize default (Y/N)
     DEFAULT=${DEFAULT^^}
     
-    # Determine answer based on mode
     if [ "$MODE" = "auto" ]; then
-        # Auto mode: use default without asking
         ANSWER="$DEFAULT"
         if [ "$DEFAULT" = "Y" ]; then
             echo -e "${GREEN}   ✓ Auto-running (default: Yes)${RESET}"
@@ -213,12 +200,11 @@ for ENTRY in "${SCRIPTS[@]}"; do
             echo -e "${YELLOW}   ⊘ Auto-skipping (default: No)${RESET}"
         fi
     else
-        # Manual mode: ask user
         PROMPT="   ➤ Run this script? (y/N): "
         [ "$DEFAULT" == "Y" ] && PROMPT="   ➤ Run this script? (Y/n): "
         
         read -rp "$PROMPT" USER_INPUT
-        ANSWER=${USER_INPUT:-$DEFAULT}  # use default if empty
+        ANSWER=${USER_INPUT:-$DEFAULT}
     fi
     
     echo
@@ -230,7 +216,6 @@ for ENTRY in "${SCRIPTS[@]}"; do
             
             START_TIME=$(date +%s)
             
-            # Run script with output redirection
             if bash "$SCRIPT_PATH" 2>&1 | while IFS= read -r line; do
                 echo "$line"
                 echo "$line" >> "$LOG_FILE" 2>/dev/null || true
@@ -251,7 +236,6 @@ for ENTRY in "${SCRIPTS[@]}"; do
                 FAILED_SCRIPTS+=("$SCRIPT")
                 FAILED=$((FAILED + 1))
                 
-                # Ask if user wants to continue (only in manual mode)
                 if [ "$MODE" = "manual" ]; then
                     read -rp "Continue with remaining scripts? (Y/n): " CONTINUE
                     if [[ $CONTINUE =~ ^[Nn]$ ]]; then
@@ -289,7 +273,6 @@ echo -e "${GREEN}✅ Successful:     ${BOLD}${SUCCESSFUL}${RESET}"
 echo -e "${RED}✖  Failed:         ${BOLD}${FAILED}${RESET}"
 echo -e "${YELLOW}⚠  Skipped:        ${BOLD}${SKIPPED}${RESET}\n"
 
-# Show successful scripts
 if [ ${#SUCCESS_SCRIPTS[@]} -gt 0 ]; then
     echo -e "${GREEN}${BOLD}✅ Successful Scripts:${RESET}"
     for script in "${SUCCESS_SCRIPTS[@]}"; do
@@ -298,7 +281,6 @@ if [ ${#SUCCESS_SCRIPTS[@]} -gt 0 ]; then
     echo
 fi
 
-# Show failed scripts
 if [ ${#FAILED_SCRIPTS[@]} -gt 0 ]; then
     echo -e "${RED}${BOLD}✖ Failed Scripts:${RESET}"
     for script in "${FAILED_SCRIPTS[@]}"; do
@@ -307,7 +289,6 @@ if [ ${#FAILED_SCRIPTS[@]} -gt 0 ]; then
     echo
 fi
 
-# Show skipped scripts
 if [ ${#SKIPPED_SCRIPTS[@]} -gt 0 ]; then
     echo -e "${YELLOW}${BOLD}⚠ Skipped Scripts:${RESET}"
     for script in "${SKIPPED_SCRIPTS[@]}"; do
@@ -321,7 +302,6 @@ log "Successful: $SUCCESSFUL, Failed: $FAILED, Skipped: $SKIPPED"
 
 echo -e "${BLUE}📝 Full log saved to: ${BOLD}${LOG_FILE}${RESET}\n"
 
-# --- Final status ---
 if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}${BOLD}"
     cat << "EOF"
