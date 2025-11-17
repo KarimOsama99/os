@@ -2,6 +2,7 @@
 #============================================================#
 #                  Zsh Configuration Script                  #
 #          Install Oh My Zsh + Plugins + Aliases            #
+#         (Fixed for Powerlevel10k instant prompt)          #
 #============================================================#
 
 set -euo pipefail
@@ -25,11 +26,9 @@ section() { echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${RESET}\n"; }
 #   Get User Info  #
 #==================#
 if [ "$EUID" -eq 0 ]; then
-    # Running as root, get the real user
     REAL_USER=${SUDO_USER:-$USER}
     USER_HOME=$(eval echo ~$REAL_USER)
 else
-    # Running as normal user
     REAL_USER=$USER
     USER_HOME=$HOME
 fi
@@ -40,7 +39,7 @@ echo "${CYAN}${BOLD}"
 cat << "EOF"
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
-║         🐚  Zsh Configuration & Setup  🐚            ║
+║          🐚  Zsh Configuration & Setup  🐚            ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 EOF
@@ -113,7 +112,6 @@ if [ -d "$USER_HOME/.oh-my-zsh" ]; then
 else
     info "Installing Oh My Zsh..."
     
-    # Install as the real user
     sudo -u $REAL_USER bash <<'OMZEOF'
 export RUNZSH=no
 export CHSH=no
@@ -130,7 +128,6 @@ section "Installing Zsh Plugins"
 
 ZSH_CUSTOM="$USER_HOME/.oh-my-zsh/custom"
 
-# 1. zsh-autosuggestions
 info "Installing zsh-autosuggestions..."
 if [ -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
     warn "zsh-autosuggestions already installed"
@@ -140,7 +137,6 @@ else
     success "zsh-autosuggestions installed"
 fi
 
-# 2. zsh-syntax-highlighting
 info "Installing zsh-syntax-highlighting..."
 if [ -d "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting" ]; then
     warn "zsh-syntax-highlighting already installed"
@@ -150,7 +146,6 @@ else
     success "zsh-syntax-highlighting installed"
 fi
 
-# 3. zsh-completions
 info "Installing zsh-completions..."
 if [ -d "$ZSH_CUSTOM/plugins/zsh-completions" ]; then
     warn "zsh-completions already installed"
@@ -160,16 +155,23 @@ else
     success "zsh-completions installed"
 fi
 
-# 4. fast-syntax-highlighting (alternative, faster)
-read -rp "Install fast-syntax-highlighting (faster alternative)? (y/n): " install_fsh
-if [[ $install_fsh == [Yy]* ]]; then
-    info "Installing fast-syntax-highlighting..."
-    if [ -d "$ZSH_CUSTOM/plugins/fast-syntax-highlighting" ]; then
-        warn "fast-syntax-highlighting already installed"
+#===========================================#
+#   Install Powerlevel10k Theme            #
+#===========================================#
+section "Installing Powerlevel10k Theme"
+
+read -rp "Install Powerlevel10k theme? (recommended) (y/n): " install_p10k
+if [[ $install_p10k == [Yy]* ]]; then
+    info "Installing Powerlevel10k..."
+    
+    if [ -d "$ZSH_CUSTOM/themes/powerlevel10k" ]; then
+        warn "Powerlevel10k already installed"
     else
-        sudo -u $REAL_USER git clone https://github.com/zdharma-continuum/fast-syntax-highlighting \
-            "$ZSH_CUSTOM/plugins/fast-syntax-highlighting"
-        success "fast-syntax-highlighting installed"
+        sudo -u $REAL_USER git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
+            "$ZSH_CUSTOM/themes/powerlevel10k"
+        
+        success "Powerlevel10k installed!"
+        info "Run 'p10k configure' after restarting your terminal to customize"
     fi
 fi
 
@@ -178,78 +180,59 @@ fi
 #===========================================#
 section "Configuring .zshrc"
 
-# Backup existing .zshrc
 if [ -f "$ZSHRC" ]; then
     info "Backing up existing .zshrc..."
     cp "$ZSHRC" "${ZSHRC}.backup.$(date +%Y%m%d_%H%M%S)"
     success "Backup created"
 fi
 
-# Enable plugins in .zshrc
-info "Enabling plugins..."
+info "Creating optimized .zshrc configuration..."
 
-if [[ $install_fsh == [Yy]* ]]; then
-    PLUGINS="git zsh-autosuggestions zsh-completions fast-syntax-highlighting"
-else
-    PLUGINS="git zsh-autosuggestions zsh-completions zsh-syntax-highlighting"
+# Create the new .zshrc with proper Powerlevel10k support
+cat > "$ZSHRC" <<'ZSHRCEOF'
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-if [ -f "$ZSHRC" ]; then
-    sed -i "s/^plugins=.*/plugins=($PLUGINS)/" "$ZSHRC"
-else
-    # Create basic .zshrc if it doesn't exist
-    cat > "$ZSHRC" <<ZSHRCEOF
-export ZSH="\$HOME/.oh-my-zsh"
-ZSH_THEME="robbyrussell"
-plugins=($PLUGINS)
-source \$ZSH/oh-my-zsh.sh
-ZSHRCEOF
-fi
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Oh My Zsh Configuration
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export ZSH="$HOME/.oh-my-zsh"
 
-success "Plugins enabled: $PLUGINS"
+# Set theme
+ZSH_THEME="THEME_PLACEHOLDER"
 
-#===========================================#
-#   Add Custom Configurations              #
-#===========================================#
-section "Adding Custom Configurations"
+# Plugins
+plugins=(
+    git
+    zsh-autosuggestions
+    zsh-completions
+    zsh-syntax-highlighting
+)
 
-# Marker to identify our custom config
-MARKER="# --- WOLF OS Custom Configuration ---"
+# Load Oh My Zsh
+source $ZSH/oh-my-zsh.sh
 
-if grep -qF "$MARKER" "$ZSHRC"; then
-    info "Custom configuration already exists"
-    read -rp "Do you want to update it? (y/n): " update_config
-    if [[ $update_config == [Yy]* ]]; then
-        # Remove old config
-        sed -i "/$MARKER/,\$d" "$ZSHRC"
-    else
-        info "Skipping configuration update"
-        exit 0
-    fi
-fi
-
-# Add custom configuration
-cat >> "$ZSHRC" <<'CUSTOMEOF'
-
-# --- WOLF OS Custom Configuration ---
-
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # History Configuration
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HISTSIZE=100000
 SAVEHIST=100000
 HISTFILE=~/.zsh_history
-setopt HIST_IGNORE_ALL_DUPS     # Don't record duplicates
-setopt HIST_IGNORE_SPACE        # Don't record commands starting with space
-setopt HIST_REDUCE_BLANKS       # Remove superfluous blanks
-setopt HIST_VERIFY             # Show command with history expansion before running
-setopt SHARE_HISTORY           # Share history between all sessions
-setopt APPEND_HISTORY          # Append to history file
-setopt INC_APPEND_HISTORY      # Write to history file immediately
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_IGNORE_SPACE
+setopt HIST_REDUCE_BLANKS
+setopt HIST_VERIFY
+setopt SHARE_HISTORY
+setopt APPEND_HISTORY
+setopt INC_APPEND_HISTORY
 
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Completion Configuration
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 autoload -Uz compinit
 compinit
 
@@ -266,98 +249,41 @@ zstyle ':completion:*' menu select
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ~/.zsh/cache
 
-# ===================================
-# Eza Aliases (Modern ls replacement)
-# ===================================
-if command -v eza &> /dev/null; then
-    alias ls='eza --color=auto --icons=auto'
-    alias ll='eza -lh --icons=auto'
-    alias la='eza -lah --icons=auto'
-    alias lt='eza -T --icons=auto'
-    alias l='eza --icons=auto'
-else
-    # Fallback to regular ls
-    alias ls='ls --color=auto'
-    alias ll='ls -lh'
-    alias la='ls -lah'
-    alias l='ls'
-fi
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Path Configuration (SILENT - No console output)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# ===================================
-# System Update & Maintenance Aliases
-# ===================================
-alias update='sudo apt update && sudo apt upgrade -y'
-alias upgrade='sudo apt update && sudo apt full-upgrade -y'
-alias clean='sudo apt autoremove -y && sudo apt autoclean'
-alias cleanup='sudo apt autoremove -y && sudo apt autoclean && sudo apt clean'
-
-# ===================================
-# Directory Navigation
-# ===================================
-alias ..='cd ..'
-alias ...='cd ../..'
-alias ....='cd ../../..'
-alias .....='cd ../../../..'
-
-# ===================================
-# Git Aliases
-# ===================================
-alias gs='git status'
-alias ga='git add'
-alias gc='git commit'
-alias gp='git push'
-alias gl='git log --oneline --graph --decorate'
-alias gd='git diff'
-alias gco='git checkout'
-alias gb='git branch'
-
-# ===================================
-# Safety Aliases
-# ===================================
-alias rm='rm -i'
-alias cp='cp -i'
-alias mv='mv -i'
-
-# ===================================
-# System Info
-# ===================================
-alias df='df -h'
-alias du='du -h'
-alias free='free -h'
-alias ports='sudo netstat -tulanp'
-alias myip='curl ifconfig.me'
-
-# ===================================
-# Development
-# ===================================
-alias py='python3'
-alias pip='pip3'
-
-# Node.js via nvm
+# Node.js via nvm - LAZY LOADING (fixes instant prompt warning)
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 
-# Auto-use Node.js version from .nvmrc if present
-autoload -U add-zsh-hook
-load-nvmrc() {
-  local node_version="$(nvm version)"
-  local nvmrc_path="$(nvm_find_nvmrc)"
-
-  if [ -n "$nvmrc_path" ]; then
-    local nvmrc_node_version=$(nvm version "$(cat "${nvmrc_path}")")
-
-    if [ "$nvmrc_node_version" = "N/A" ]; then
-      nvm install
-    elif [ "$nvmrc_node_version" != "$node_version" ]; then
-      nvm use
-    fi
-  elif [ "$node_version" != "$(nvm version default)" ]; then
-    nvm use default
-  fi
+# Lazy load nvm (loads only when called)
+nvm() {
+    unset -f nvm
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+    nvm "$@"
 }
-add-zsh-hook chpwd load-nvmrc
-load-nvmrc
+
+# Lazy load node
+node() {
+    unset -f node
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    node "$@"
+}
+
+# Lazy load npm
+npm() {
+    unset -f npm
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    npm "$@"
+}
+
+# Lazy load npx
+npx() {
+    unset -f npx
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    npx "$@"
+}
 
 # Go language
 export PATH=$PATH:/usr/local/go/bin
@@ -367,15 +293,81 @@ export PATH=$PATH:$GOPATH/bin
 # pipx
 export PATH="$PATH:$HOME/.local/bin"
 
-# Ruby gems
+# Ruby gems (silent)
 if command -v ruby &> /dev/null && command -v gem &> /dev/null; then
-    GEM_PATH=$(gem environment | grep "EXECUTABLE DIRECTORY" | cut -d: -f2 | xargs)
+    GEM_PATH=$(gem environment 2>/dev/null | grep "EXECUTABLE DIRECTORY" | cut -d: -f2 | xargs)
     [ -n "$GEM_PATH" ] && export PATH="$PATH:$GEM_PATH"
 fi
 
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Eza Aliases (Modern ls replacement)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if command -v eza &> /dev/null; then
+    alias ls='eza --color=auto --icons=auto'
+    alias ll='eza -lh --icons=auto'
+    alias la='eza -lah --icons=auto'
+    alias lt='eza -T --icons=auto'
+    alias l='eza --icons=auto'
+else
+    alias ls='ls --color=auto'
+    alias ll='ls -lh'
+    alias la='ls -lah'
+    alias l='ls'
+fi
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Update & Maintenance Aliases
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+alias update='sudo apt update && sudo apt upgrade -y'
+alias upgrade='sudo apt update && sudo apt full-upgrade -y'
+alias clean='sudo apt autoremove -y && sudo apt autoclean'
+alias cleanup='sudo apt autoremove -y && sudo apt autoclean && sudo apt clean'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Directory Navigation
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+alias .....='cd ../../../..'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Git Aliases
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+alias gs='git status'
+alias ga='git add'
+alias gc='git commit'
+alias gp='git push'
+alias gl='git log --oneline --graph --decorate'
+alias gd='git diff'
+alias gco='git checkout'
+alias gb='git branch'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Safety Aliases
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# System Info
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+alias df='df -h'
+alias du='du -h'
+alias free='free -h'
+alias ports='sudo netstat -tulanp'
+alias myip='curl -s ifconfig.me'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Development
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+alias py='python3'
+alias pip='pip3'
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Custom Functions
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Create directory and cd into it
 mkcd() {
@@ -409,72 +401,39 @@ backup() {
     cp -r "$1" "$1.backup.$(date +%Y%m%d_%H%M%S)"
 }
 
-# ===================================
-# Welcome Banner (figlet + lolcat)
-# ===================================
-if command -v figlet &> /dev/null && command -v lolcat &> /dev/null; then
-    figlet -c "W O L F - O S" | lolcat
-    echo ""
-fi
-
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Autosuggestions Configuration
-# ===================================
-# Change suggestion color
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=240'
-
-# Accept suggestion with Ctrl+Space
 bindkey '^ ' autosuggest-accept
 
-# ===================================
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Key Bindings
-# ===================================
-# Ctrl+Left/Right for word navigation
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 bindkey "^[[1;5C" forward-word
 bindkey "^[[1;5D" backward-word
-
-# Home/End keys
 bindkey "^[[H" beginning-of-line
 bindkey "^[[F" end-of-line
-
-# Delete key
 bindkey "^[[3~" delete-char
 
-# ===================================
-# Theme Customization (optional)
-# ===================================
-# Uncomment to use Powerlevel10k theme (requires installation)
-# ZSH_THEME="powerlevel10k/powerlevel10k"
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Powerlevel10k Configuration
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+ZSHRCEOF
 
-CUSTOMEOF
+# Set the theme based on whether P10k was installed
+if [[ $install_p10k == [Yy]* ]]; then
+    sed -i 's/ZSH_THEME="THEME_PLACEHOLDER"/ZSH_THEME="powerlevel10k\/powerlevel10k"/' "$ZSHRC"
+else
+    sed -i 's/ZSH_THEME="THEME_PLACEHOLDER"/ZSH_THEME="robbyrussell"/' "$ZSHRC"
+fi
 
-success "Custom configuration added to .zshrc"
-
-# Set proper ownership
 chown $REAL_USER:$REAL_USER "$ZSHRC"
 
-#===========================================#
-#   Install Optional Themes                #
-#===========================================#
-section "Optional: Install Powerlevel10k Theme"
-
-read -rp "Install Powerlevel10k theme? (recommended) (y/n): " install_p10k
-if [[ $install_p10k == [Yy]* ]]; then
-    info "Installing Powerlevel10k..."
-    
-    if [ -d "$ZSH_CUSTOM/themes/powerlevel10k" ]; then
-        warn "Powerlevel10k already installed"
-    else
-        sudo -u $REAL_USER git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
-            "$ZSH_CUSTOM/themes/powerlevel10k"
-        
-        # Enable the theme
-        sed -i 's/^ZSH_THEME=.*/ZSH_THEME="powerlevel10k\/powerlevel10k"/' "$ZSHRC"
-        
-        success "Powerlevel10k installed!"
-        info "Run 'p10k configure' after restarting your terminal to customize"
-    fi
-fi
+success "Optimized .zshrc configuration created!"
+info "✨ Lazy loading enabled for nvm (fixes instant prompt)"
 
 #===========================================#
 #   Install Eza (modern ls)                #
@@ -488,20 +447,19 @@ else
     
     if [ "$EUID" -ne 0 ]; then
         sudo apt update
-        sudo apt install -y eza || {
-            warn "Eza not available in repos, trying from GitHub..."
-            # Fallback installation
-            sudo mkdir -p /usr/local/bin
-            sudo wget -qO /usr/local/bin/eza https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz
-            sudo tar xzf /usr/local/bin/eza -C /usr/local/bin
-            sudo chmod +x /usr/local/bin/eza
+        sudo apt install -y eza 2>/dev/null || {
+            warn "Eza not available in repos, skipping..."
         }
     else
         apt update
-        apt install -y eza || warn "Could not install eza"
+        apt install -y eza 2>/dev/null || {
+            warn "Eza not available in repos, skipping..."
+        }
     fi
     
-    success "Eza installed!"
+    if command -v eza &> /dev/null; then
+        success "Eza installed!"
+    fi
 fi
 
 #===========================================#
@@ -523,6 +481,7 @@ fi
 echo "  ✓ Custom aliases and functions configured"
 echo "  ✓ History and completion optimized"
 echo "  ✓ Development environment paths configured"
+echo "  ✓ NVM lazy loading enabled (no more instant prompt warnings!)"
 echo
 warn "⚠️  Important Next Steps:"
 echo
@@ -532,13 +491,19 @@ if [[ $install_p10k == [Yy]* ]]; then
     echo "  3. Run: ${CYAN}p10k configure${RESET} to customize Powerlevel10k"
 fi
 echo
+info "🔧 Fixed Issues:"
+echo
+echo "  ✅ No more instant prompt warnings"
+echo "  ✅ NVM loads only when needed (lazy loading)"
+echo "  ✅ Fast terminal startup"
+echo "  ✅ All paths configured silently"
+echo
 info "📚 Useful Commands:"
 echo
 echo "  ${CYAN}update${RESET}    - Update system packages"
 echo "  ${CYAN}clean${RESET}     - Remove unused packages"
 echo "  ${CYAN}ll${RESET}        - List files with details"
 echo "  ${CYAN}la${RESET}        - List all files including hidden"
-echo "  ${CYAN}lt${RESET}        - Show directory tree"
 echo "  ${CYAN}mkcd <dir>${RESET} - Create and enter directory"
 echo "  ${CYAN}extract <file>${RESET} - Extract any archive"
 echo "  ${CYAN}backup <file>${RESET} - Quick backup with timestamp"
@@ -548,11 +513,6 @@ echo
 echo "  ${CYAN}Ctrl + Space${RESET}  - Accept autosuggestion"
 echo "  ${CYAN}Ctrl + Left/Right${RESET} - Navigate words"
 echo "  ${CYAN}↑/↓${RESET} - History search"
-echo
-info "🎨 Customize Zsh:"
-echo
-echo "  Edit: ${CYAN}~/.zshrc${RESET}"
-echo "  Backup: ${CYAN}~/.zshrc.backup.*${RESET}"
 echo
 success "🐺 Enjoy your new Zsh setup!"
 echo
