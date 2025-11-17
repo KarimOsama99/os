@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #============================================================#
 #              WOLF OS Wallpapers Installation               #
-#              (wolf-greeter.jpg only for LightDM)           #
+#       Make wolf-os the default wallpapers collection      #
 #============================================================#
 
 set -euo pipefail
@@ -11,12 +11,14 @@ GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
 BLUE="\033[1;34m"
 CYAN="\033[1;36m"
+MAGENTA="\033[1;35m"
 RESET="\033[0m"
 
 info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
+section() { echo -e "${CYAN}${BOLD}━━━ $1 ━━━${RESET}"; }
 
 #==================#
 #   Check Root     #
@@ -77,6 +79,103 @@ chmod 644 "$SYSTEM_WALLPAPERS"/*
 
 success "Wallpapers copied!"
 
+#===========================================#
+#   Create GNOME XML Wallpaper Metadata    #
+#===========================================#
+section "Creating GNOME wallpaper metadata"
+
+GNOME_PROPERTIES_DIR="/usr/share/gnome-background-properties"
+mkdir -p "$GNOME_PROPERTIES_DIR"
+
+WOLF_XML="$GNOME_PROPERTIES_DIR/wolf-os-wallpapers.xml"
+
+info "Generating wallpaper metadata XML..."
+
+cat > "$WOLF_XML" << 'XMLEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+<wallpapers>
+XMLEOF
+
+# Find all image files and add them to XML
+find "$SYSTEM_WALLPAPERS" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" \) | while read -r wallpaper; do
+    filename=$(basename "$wallpaper")
+    name="${filename%.*}"
+    # Capitalize first letter and replace dashes/underscores with spaces
+    pretty_name=$(echo "$name" | sed 's/[-_]/ /g' | sed 's/\b\(.\)/\u\1/g')
+    
+    cat >> "$WOLF_XML" << ITEMEOF
+  <wallpaper deleted="false">
+    <name>WOLF OS - $pretty_name</name>
+    <filename>$wallpaper</filename>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#000000</pcolor>
+    <scolor>#000000</scolor>
+  </wallpaper>
+ITEMEOF
+done
+
+cat >> "$WOLF_XML" << 'XMLEOF'
+</wallpapers>
+XMLEOF
+
+chmod 644 "$WOLF_XML"
+success "GNOME metadata created: $WOLF_XML"
+
+#===========================================#
+#   Create XFCE Wallpaper List             #
+#===========================================#
+section "Creating XFCE wallpaper metadata"
+
+XFCE_BACKDROPS_DIR="/usr/share/xfce4/backdrops"
+mkdir -p "$XFCE_BACKDROPS_DIR"
+
+# Create symlink to make wallpapers appear in XFCE
+if [ -L "$XFCE_BACKDROPS_DIR/wolf-os" ]; then
+    rm "$XFCE_BACKDROPS_DIR/wolf-os"
+fi
+
+ln -sf "$SYSTEM_WALLPAPERS" "$XFCE_BACKDROPS_DIR/wolf-os"
+success "XFCE wallpapers linked: $XFCE_BACKDROPS_DIR/wolf-os"
+
+#===========================================#
+#   Create KDE Wallpaper Metadata          #
+#===========================================#
+section "Creating KDE wallpaper metadata"
+
+KDE_WALLPAPER_DIR="/usr/share/wallpapers/WOLF-OS"
+mkdir -p "$KDE_WALLPAPER_DIR/contents/images"
+
+# Copy wallpapers for KDE
+cp "$SYSTEM_WALLPAPERS"/* "$KDE_WALLPAPER_DIR/contents/images/" 2>/dev/null || true
+
+# Create metadata.desktop for KDE
+cat > "$KDE_WALLPAPER_DIR/metadata.desktop" << 'KDEEOF'
+[Desktop Entry]
+Name=WOLF OS Wallpapers
+X-KDE-PluginInfo-Name=WOLF-OS
+X-KDE-PluginInfo-Author=WOLF OS Team
+X-KDE-PluginInfo-License=CC-BY-SA-4.0
+KDEEOF
+
+chmod 644 "$KDE_WALLPAPER_DIR/metadata.desktop"
+success "KDE wallpapers configured: $KDE_WALLPAPER_DIR"
+
+#===========================================#
+#   Make WOLF OS Default Wallpaper Set     #
+#===========================================#
+section "Configuring as default wallpaper collection"
+
+# Create a marker file to indicate these are system wallpapers
+cat > "$SYSTEM_WALLPAPERS/.wolf-os-wallpapers" << 'MARKEREOF'
+WOLF OS Official Wallpapers
+Installed by WOLF OS Setup Script
+These wallpapers are now part of the system wallpaper collection
+MARKEREOF
+
+success "WOLF OS wallpapers registered as system collection!"
+
 #==================#
 #   Get User Info  #
 #==================#
@@ -106,7 +205,7 @@ run_as_user() {
 }
 
 echo
-info "🖼️  Configuring desktop wallpapers..."
+section "Configuring desktop wallpapers"
 echo
 
 # GNOME
@@ -207,7 +306,7 @@ fi
 #   (wolf-greeter.jpg ONLY for LightDM)    #
 #===========================================#
 echo
-info "🔐 Configuring login screen wallpapers..."
+section "Configuring login screen wallpapers"
 echo
 
 greeter_configured=false
@@ -277,21 +376,32 @@ fi
 #   Summary                                #
 #===========================================#
 echo
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-success "✅ WOLF OS Wallpapers Configured!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+success "✅ WOLF OS Wallpapers Configured as System Collection!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
-info "📋 Configuration Summary:"
+info "📋 Installation Summary:"
 echo
 echo "  📁 System Location:"
 echo "     $SYSTEM_WALLPAPERS"
 echo
+echo "  🎨 Desktop Environment Integration:"
+if [ -f "$GNOME_PROPERTIES_DIR/wolf-os-wallpapers.xml" ]; then
+    echo "     ✅ GNOME: Registered in wallpaper picker"
+fi
+if [ -L "$XFCE_BACKDROPS_DIR/wolf-os" ]; then
+    echo "     ✅ XFCE: Available in settings"
+fi
+if [ -d "$KDE_WALLPAPER_DIR" ]; then
+    echo "     ✅ KDE: Added to wallpaper collection"
+fi
+echo
 echo "  🖼️  Desktop Wallpaper:"
 echo "     $DESKTOP_WALLPAPER"
 if [ "$set_wallpaper_success" = true ]; then
-    echo "     Status: ✅ Configured"
+    echo "     Status: ✅ Currently active"
 else
-    echo "     Status: ⚠️  Manual setup required"
+    echo "     Status: ⚠️  Manual setup required (user not logged in)"
 fi
 echo
 echo "  🔐 Login Screen (LightDM only):"
@@ -302,27 +412,38 @@ else
     echo "     Status: ℹ️  Not applicable (GDM/SDDM use themes)"
 fi
 echo
-warn "⚠️  Important Notes:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
-echo "  • Desktop wallpaper changes require user to be logged in"
-echo "  • If wallpaper didn't change automatically:"
-echo "    Right-click desktop → Change Background → Browse to:"
+info "🎨 How to Use WOLF OS Wallpapers:"
+echo
+echo "  ${CYAN}GNOME / Ubuntu:${RESET}"
+echo "    Settings → Appearance → Background"
+echo "    → You'll see 'WOLF OS - ...' wallpapers in the list!"
+echo
+echo "  ${CYAN}XFCE:${RESET}"
+echo "    Desktop → Right-click → Desktop Settings"
+echo "    → Folder: wolf-os (in the dropdown)"
+echo
+echo "  ${CYAN}KDE Plasma:${RESET}"
+echo "    Desktop → Right-click → Configure Desktop and Wallpaper"
+echo "    → Look for 'WOLF OS Wallpapers' in the list"
+echo
+echo "  ${CYAN}Other DEs:${RESET}"
+echo "    Settings → Appearance → Browse to:"
 echo "    $SYSTEM_WALLPAPERS"
 echo
+warn "⚠️  Important Notes:"
+echo
+echo "  • WOLF OS wallpapers are now part of system collection"
+echo "  • They will appear in wallpaper pickers of all desktop environments"
+echo "  • Desktop wallpaper changes require user to be logged in"
 echo "  • LightDM greeter will show wolf-greeter.jpg on next login"
-echo "  • GDM/SDDM use their own theme backgrounds (not affected)"
-echo "  • GRUB and Plymouth use their own theme backgrounds"
+echo "  • To add more wallpapers, copy them to: $SYSTEM_WALLPAPERS"
+echo "  • Then re-run this script to update metadata"
 echo
-info "🔧 Manual Configuration:"
+info "🔄 Refresh Wallpaper List (if needed):"
 echo
-echo "  Desktop (any DE):"
-echo "    Settings → Appearance → Background → Browse"
-echo
-echo "  LightDM GTK:"
-echo "    Edit: /etc/lightdm/lightdm-gtk-greeter.conf"
-echo "    Set: background=$GREETER_WALLPAPER"
-echo
-echo "  LightDM Slick:"
-echo "    Edit: /etc/lightdm/slick-greeter.conf"
-echo "    Set: background=$GREETER_WALLPAPER"
+echo "  GNOME:   Log out and back in"
+echo "  XFCE:    Restart xfdesktop: xfdesktop --reload"
+echo "  KDE:     Run: kbuildsycoca5 --noincremental"
 echo
