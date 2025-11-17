@@ -87,6 +87,7 @@ SCRIPTS=(
     "catppuccinGTK.sh|Install Catppuccin GTK theme|Y"
     "catppuccinQT.sh|Install Catppuccin QT theme|Y"
     "bibataCursor.sh|Install Bibata cursor theme|Y"
+    "zshrc.sh|Configure Zsh with Oh My Zsh and plugins|Y"
     "bashrc.sh|Configure bashrc with aliases|Y"
     "finalSetup.sh|Final system configuration and cleanup|Y"
 )
