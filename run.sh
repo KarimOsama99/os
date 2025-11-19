@@ -82,13 +82,13 @@ SCRIPTS=(
     "installApps.sh|Install applications (Browsers, IDE, Media, etc)|Y"
     "installSecurityTools.sh|Install security & penetration testing tools|N"
     "installFonts.sh|Install system fonts (Arabic + English)|Y"
+    "installNeofetch.sh|Configure Neofetch with WOLF OS theme|Y"
     "installPlymouth.sh|Install and configure Plymouth boot theme|Y"
     "installGrubTheme.sh|Install and configure GRUB theme|Y"
     "catppuccinGTK.sh|Install Catppuccin GTK theme|Y"
     "catppuccinQT.sh|Install Catppuccin QT theme|Y"
     "bibataCursor.sh|Install Bibata cursor theme|Y"
     "zshrc.sh|Configure Zsh with Oh My Zsh and plugins|Y"
-    "bashrc.sh|Configure bashrc with aliases|Y"
     "finalSetup.sh|Final system configuration and cleanup|Y"
 )
 

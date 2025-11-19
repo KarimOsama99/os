@@ -9,12 +9,15 @@ RED="\033[1;31m"
 GREEN="\033[1;32m"
 YELLOW="\033[1;33m"
 BLUE="\033[1;34m"
+CYAN="\033[1;36m"
+MAGENTA="\033[1;35m"
 RESET="\033[0m"
 
 info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
+section() { echo -e "${CYAN}━━━ $1 ━━━${RESET}"; }
 
 #==================#
 #   Require Root   #
@@ -38,6 +41,7 @@ echo
 #==================#
 # Update System
 #==================#
+section "System Update"
 info "Updating package lists..."
 apt update
 success "Package lists updated"
@@ -45,10 +49,11 @@ success "Package lists updated"
 #==================#
 # Brave Browser
 #==================#
-info "Installing Brave Browser..."
+section "Installing Brave Browser"
 if command -v brave-browser &> /dev/null; then
     warn "Brave already installed, skipping..."
 else
+    info "Installing Brave Browser..."
     curl -fsS https://dl.brave.com/install.sh | sh
     success "Brave Browser installed"
 fi
@@ -56,7 +61,7 @@ fi
 #==================#
 # VS Code
 #==================#
-info "Installing Visual Studio Code..."
+section "Installing Visual Studio Code"
 if command -v code &> /dev/null; then
     warn "VS Code already installed, skipping..."
 else
@@ -70,73 +75,67 @@ else
 fi
 
 #==================#
-# Ruby (for lolcat)
-#==================#
-info "Installing Ruby..."
-apt install -y ruby-full ruby-dev build-essential
-success "Ruby installed"
-
-RUBY_VERSION=$(ruby --version)
-info "Installed: $RUBY_VERSION"
-
-#==================#
 # Node.js via nvm
 #==================#
-info "Installing Node.js via nvm..."
+section "Installing Node.js via NVM"
 if [ -d "$USER_HOME/.nvm" ]; then
     warn "nvm already installed, skipping..."
 else
     info "Installing nvm for user $REAL_USER..."
     
     # Download and install nvm as the real user
-    sudo -u $REAL_USER bash <<'EOF'
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-EOF
+    NVM_VERSION="v0.40.1"
+    sudo -u $REAL_USER bash <<NVMEOF
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh | bash
+NVMEOF
     
     success "nvm installed"
     
-    info "Installing Node.js 24..."
+    info "Installing Node.js 22..."
     # Load nvm and install Node.js as the real user
-    sudo -u $REAL_USER bash <<'EOF'
+    sudo -u $REAL_USER bash <<'NODEEOF'
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-nvm install 24
-nvm alias default 24
-nvm use 24
-EOF
+nvm install 22
+nvm alias default 22
+nvm use 22
+NODEEOF
     
-    success "Node.js 24 installed and set as default"
+    success "Node.js 22 installed and set as default"
     
-    # Configure nvm in shell profiles with auto-use
+    # Configure nvm in shell profiles
     for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
         if [ -f "$rc_file" ] && ! grep -q "NVM_DIR" "$rc_file"; then
-            cat >> "$rc_file" <<'NVMEOF'
+            cat >> "$rc_file" <<'NVMRCEOF'
 
 # nvm configuration
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-# Auto-use default Node.js version
-nvm use default &>/dev/null
-NVMEOF
+NVMRCEOF
         fi
     done
     
-    success "nvm configured to auto-use Node.js 24 on shell startup"
+    success "nvm configured in shell profiles"
 fi
 
 #==================#
-# LibreOffice
+# LibreOffice (Optional)
 #==================#
-info "Installing LibreOffice..."
-apt install -y libreoffice libreoffice-gtk3 libreoffice-l10n-ar
-success "LibreOffice installed (with Arabic support)"
+section "LibreOffice Installation"
+read -rp "Install LibreOffice with Arabic support? (y/n): " install_libreoffice
+if [[ $install_libreoffice == [Yy]* ]]; then
+    info "Installing LibreOffice..."
+    apt install -y libreoffice libreoffice-gtk3 libreoffice-l10n-ar
+    success "LibreOffice installed (with Arabic support)"
+else
+    info "Skipping LibreOffice installation"
+fi
 
 #==================#
 # Spotify
 #==================#
-info "Installing Spotify..."
+section "Installing Spotify"
 if command -v spotify &> /dev/null; then
     warn "Spotify already installed, skipping..."
 else
@@ -149,73 +148,81 @@ else
 fi
 
 #==================#
-# AnyDesk
+# AnyDesk (Optional)
 #==================#
-info "Installing AnyDesk..."
-if command -v anydesk &> /dev/null; then
-    warn "AnyDesk already installed, skipping..."
+section "AnyDesk Installation"
+read -rp "Install AnyDesk (remote desktop)? (y/n): " install_anydesk
+if [[ $install_anydesk == [Yy]* ]]; then
+    if command -v anydesk &> /dev/null; then
+        warn "AnyDesk already installed, skipping..."
+    else
+        info "Installing AnyDesk..."
+        wget -qO - https://keys.anydesk.com/repos/DEB-GPG-KEY | apt-key add -
+        echo "deb http://deb.anydesk.com/ all main" > /etc/apt/sources.list.d/anydesk-stable.list
+        apt update
+        apt install -y anydesk
+        success "AnyDesk installed"
+    fi
 else
-    # Add AnyDesk repository
-    wget -qO - https://keys.anydesk.com/repos/DEB-GPG-KEY | apt-key add -
-    echo "deb http://deb.anydesk.com/ all main" > /etc/apt/sources.list.d/anydesk-stable.list
-    apt update
-    apt install -y anydesk
-    success "AnyDesk installed"
+    info "Skipping AnyDesk installation"
 fi
 
 #==================#
-# Discord
+# Discord (Optional)
 #==================#
-info "Installing Discord..."
-if command -v discord &> /dev/null; then
-    warn "Discord already installed, skipping..."
+section "Discord Installation"
+read -rp "Install Discord? (y/n): " install_discord
+if [[ $install_discord == [Yy]* ]]; then
+    if command -v discord &> /dev/null; then
+        warn "Discord already installed, skipping..."
+    else
+        info "Installing Discord..."
+        DISCORD_URL="https://discord.com/api/download?platform=linux&format=deb"
+        wget -O /tmp/discord.deb "$DISCORD_URL"
+        apt install -y /tmp/discord.deb
+        rm -f /tmp/discord.deb
+        success "Discord installed"
+    fi
 else
-    DISCORD_URL="https://discord.com/api/download?platform=linux&format=deb"
-    wget -O /tmp/discord.deb "$DISCORD_URL"
-    apt install -y /tmp/discord.deb
-    rm -f /tmp/discord.deb
-    success "Discord installed"
+    info "Skipping Discord installation"
 fi
 
 #==================#
 # GParted
 #==================#
-info "Installing GParted..."
+section "Installing GParted"
 apt install -y gparted
 success "GParted installed"
 
 #==================#
 # Btop
 #==================#
-info "Installing Btop..."
+section "Installing Btop"
 apt install -y btop
 success "Btop installed"
 
 #==================#
 # VLC Media Player
 #==================#
-info "Installing VLC Media Player..."
+section "Installing VLC Media Player"
 apt install -y vlc
 success "VLC installed"
 
 #==================#
 # Wireshark
 #==================#
-info "Installing Wireshark..."
-# Preconfigure wireshark to allow non-root users
+section "Installing Wireshark"
 echo "wireshark-common wireshark-common/install-setuid boolean true" | debconf-set-selections
 apt install -y wireshark
-# Add user to wireshark group
 usermod -aG wireshark $REAL_USER
 success "Wireshark installed (user $REAL_USER added to wireshark group)"
 
 #==================#
 # Text Editor
 #==================#
-info "Checking for text editors..."
+section "Checking for Text Editors"
 EDITOR_INSTALLED=false
 
-# Check for common text editors
 for editor in gedit kate pluma mousepad leafpad geany; do
     if command -v $editor &> /dev/null; then
         EDITOR_INSTALLED=true
@@ -235,7 +242,7 @@ fi
 #==================#
 # Proxychains-ng
 #==================#
-info "Installing Proxychains-ng..."
+section "Installing Proxychains-ng"
 apt install -y proxychains4
 success "Proxychains-ng installed"
 
@@ -251,7 +258,7 @@ fi
 #==================#
 # Tor Service
 #==================#
-info "Installing Tor service..."
+section "Installing Tor Service"
 apt install -y tor
 success "Tor service installed"
 
@@ -263,13 +270,21 @@ success "Tor service is running"
 #==================#
 # Tor Browser
 #==================#
-info "Installing Tor Browser..."
+section "Installing Tor Browser"
 if [ -d "/opt/tor-browser" ]; then
     warn "Tor Browser already installed at /opt/tor-browser"
 else
     apt install -y libdbus-glib-1-2 libgtk-3-0
     
-    TOR_VERSION="15.0.1"
+    # Get latest version dynamically
+    info "Fetching latest Tor Browser version..."
+    TOR_VERSION=$(curl -s https://www.torproject.org/download/ | grep -oP 'torbrowser/\K[0-9.]+' | head -1)
+    
+    if [ -z "$TOR_VERSION" ]; then
+        warn "Could not fetch latest version, using fallback 15.0.1"
+        TOR_VERSION="15.0.1"
+    fi
+    
     TOR_ARCH="linux-x86_64"
     TOR_URL="https://www.torproject.org/dist/torbrowser/${TOR_VERSION}/tor-browser-${TOR_ARCH}-${TOR_VERSION}.tar.xz"
     
@@ -299,26 +314,14 @@ fi
 #==================#
 # OpenVPN
 #==================#
-info "Installing OpenVPN..."
+section "Installing OpenVPN"
 apt install -y openvpn network-manager-openvpn network-manager-openvpn-gnome
 success "OpenVPN installed"
 
 #==================#
-# Apache2
-#==================#
-info "Installing Apache2 web server..."
-apt install -y apache2
-success "Apache2 installed"
-
-info "Starting and enabling Apache2..."
-systemctl enable apache2
-systemctl start apache2
-success "Apache2 is running (http://localhost)"
-
-#==================#
 # Python3 & pipx
 #==================#
-info "Installing Python3 and essential tools..."
+section "Installing Python3 and Essential Tools"
 apt install -y python3 python3-pip python3-venv python3-dev
 success "Python3 installed"
 
@@ -342,113 +345,21 @@ fi
 success "pipx configured"
 
 #==================#
-# Figlet & Lolcat
+# Figlet (for banner)
 #==================#
-info "Installing figlet and lolcat..."
+section "Installing Figlet"
 apt install -y figlet
 success "Figlet installed"
-
-info "Installing lolcat via gem..."
-gem install lolcat
-success "Lolcat installed"
-
-# Ensure lolcat is in PATH
-LOLCAT_PATH=$(gem environment | grep "EXECUTABLE DIRECTORY" | cut -d: -f2 | xargs)
-if [ -n "$LOLCAT_PATH" ]; then
-    for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
-        if [ -f "$rc_file" ] && ! grep -q "$LOLCAT_PATH" "$rc_file"; then
-            echo "export PATH=\"\$PATH:$LOLCAT_PATH\"" >> "$rc_file"
-        fi
-    done
-    success "Lolcat added to PATH"
-fi
-
-#==================#
-# Oh My Zsh
-#==================#
-info "Installing Zsh..."
-apt install -y zsh
-success "Zsh installed"
-
-if [ ! -d "$USER_HOME/.oh-my-zsh" ]; then
-    info "Installing Oh My Zsh for user $REAL_USER..."
-    
-    # Install Oh My Zsh as the real user
-    sudo -u $REAL_USER bash <<'EOF'
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-EOF
-    
-    success "Oh My Zsh installed"
-    
-    # Install plugins
-    info "Installing zsh-autosuggestions..."
-    sudo -u $REAL_USER git clone https://github.com/zsh-users/zsh-autosuggestions \
-        "$USER_HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions"
-    
-    info "Installing zsh-syntax-highlighting..."
-    sudo -u $REAL_USER git clone https://github.com/zsh-users/zsh-syntax-highlighting \
-        "$USER_HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
-    
-    success "Zsh plugins installed"
-    
-    # Configure .zshrc
-    ZSHRC="$USER_HOME/.zshrc"
-    if [ -f "$ZSHRC" ]; then
-        info "Configuring .zshrc..."
-        
-        # Enable plugins
-        sed -i 's/plugins=(git)/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/' "$ZSHRC"
-        
-        # Add banner at the end
-        cat >> "$ZSHRC" <<'BANNEREOF'
-
-# Custom Banner
-if command -v figlet &> /dev/null && command -v lolcat &> /dev/null; then
-    figlet -c "W O L F - O S" | lolcat
-fi
-BANNEREOF
-        
-        success ".zshrc configured with plugins and banner"
-    fi
-else
-    warn "Oh My Zsh already installed, skipping..."
-fi
-
-# Configure .bashrc with banner if it exists
-if [ -f "$BASHRC" ] && ! grep -q "W O L F - O S" "$BASHRC"; then
-    info "Adding banner to .bashrc..."
-    cat >> "$BASHRC" <<'BANNEREOF'
-
-# Custom Banner
-if command -v figlet &> /dev/null && command -v lolcat &> /dev/null; then
-    figlet -c "W O L F - O S" | lolcat
-fi
-BANNEREOF
-    success "Banner added to .bashrc"
-fi
-
-#==================#
-# Change Default Shell to Zsh (Optional)
-#==================#
-echo
-read -rp "Do you want to set Zsh as the default shell for $REAL_USER? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    info "Setting Zsh as default shell for $REAL_USER..."
-    chsh -s $(which zsh) $REAL_USER
-    success "Default shell changed to Zsh"
-    warn "⚠️  Please log out and log back in for the shell change to take effect"
-else
-    info "Keeping current shell"
-fi
 
 #==================#
 # Golang
 #==================#
-info "Installing Golang..."
+section "Installing Golang"
 
 if command -v go &> /dev/null; then
     warn "Golang already installed: $(go version)"
 else
+    info "Fetching latest Golang version..."
     GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -1)
     GO_TARBALL="${GO_VERSION}.linux-amd64.tar.gz"
     GO_URL="https://go.dev/dl/${GO_TARBALL}"
@@ -493,48 +404,46 @@ echo
 info "📋 Installed applications:"
 echo "  ✓ Brave Browser"
 echo "  ✓ VS Code"
-echo "  ✓ Node.js 24 (via nvm - auto-loads on shell start)"
-echo "  ✓ Ruby (for lolcat)"
-echo "  ✓ LibreOffice (with Arabic support)"
+echo "  ✓ Node.js 22 (via nvm)"
+if [[ $install_libreoffice == [Yy]* ]]; then
+    echo "  ✓ LibreOffice (with Arabic support)"
+fi
 echo "  ✓ Spotify"
-echo "  ✓ AnyDesk"
-echo "  ✓ Discord"
+if [[ $install_anydesk == [Yy]* ]]; then
+    echo "  ✓ AnyDesk"
+fi
+if [[ $install_discord == [Yy]* ]]; then
+    echo "  ✓ Discord"
+fi
 echo "  ✓ GParted"
 echo "  ✓ Btop"
 echo "  ✓ VLC Media Player"
 echo "  ✓ Wireshark"
-echo "  ✓ Text Editor (mousepad or existing)"
+echo "  ✓ Text Editor"
 echo "  ✓ Proxychains-ng (dynamic_chain)"
 echo "  ✓ Tor Service (running)"
-echo "  ✓ Tor Browser 15.0.1"
+echo "  ✓ Tor Browser (latest version)"
 echo "  ✓ OpenVPN"
-echo "  ✓ Apache2 (http://localhost)"
 echo "  ✓ Python3 + pip + pipx"
-echo "  ✓ Figlet + Lolcat"
-echo "  ✓ Oh My Zsh (with autosuggestions + syntax-highlighting)"
+echo "  ✓ Figlet"
 echo "  ✓ Golang"
 echo
-info "🎨 Shell Customization:"
-echo "  • Custom banner: W O L F - O S (figlet + lolcat)"
-echo "  • Zsh plugins: autosuggestions + syntax-highlighting"
-echo "  • nvm auto-loads Node.js 24 on every shell start"
-echo "  • lolcat added to PATH automatically"
+info "🎨 Customization:"
+echo "  • Zsh configuration will be handled by zshrc.sh script"
+echo "  • Custom banner available via figlet"
 echo
 info "🔧 Services status:"
 echo "  • Tor: $(systemctl is-active tor)"
-echo "  • Apache2: $(systemctl is-active apache2)"
 echo
 warn "⚠️  Important Notes:"
 echo "  1. Restart your terminal to see all changes"
-echo "  2. Node.js 24 will be automatically activated in new shells"
+echo "  2. Node.js 22 available via nvm (use: nvm use 22)"
 echo "  3. User '$REAL_USER' added to wireshark group (requires logout)"
-if [[ $answer == [Yy]* ]]; then
-    echo "  4. Zsh is now default shell (logout required)"
-fi
+echo "  4. Apache2 NOT installed (use XAMPP for web server)"
+echo "  5. Oh My Zsh will be configured by zshrc.sh script"
 echo
-info "📝 Quick commands:"
-echo "  • Node.js: node --version (auto-loaded via nvm)"
-echo "  • Ruby: ruby --version"
+info "🚀 Quick commands:"
+echo "  • Node.js: nvm use 22 && node --version"
 echo "  • Spotify: spotify"
 echo "  • Tor Browser: /opt/tor-browser/Browser/start-tor-browser"
 echo "  • Proxychains: proxychains4 <command>"

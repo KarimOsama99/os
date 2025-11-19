@@ -17,7 +17,7 @@ info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
-section() { echo -e "${CYAN}${1}${RESET}"; }
+section() { echo -e "${CYAN}$1${RESET}"; }
 
 #==================#
 #   Require Root   #
@@ -34,7 +34,7 @@ REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo ~$REAL_USER)
 
 echo "=============================================="
-echo "   🔒 Security & Penetration Testing Tools"
+echo "   🔐 Security & Penetration Testing Tools"
 echo "=============================================="
 echo
 warn "⚠️  These tools are for authorized security testing only!"
@@ -50,614 +50,478 @@ echo
 info "Updating package lists..."
 apt update
 
-#==================#
-# Network Scanning
-#==================#
+#===========================================#
+#   Essential Network Tools                #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  📡 Network Scanning & Reconnaissance
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🌐 Essential Network Tools
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install Nmap (network scanner)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y nmap
-    success "Nmap installed"
-fi
+info "Installing essential network tools..."
+apt install -y \
+    wget \
+    curl \
+    net-tools \
+    dnsutils \
+    iputils-ping \
+    traceroute
 
-read -rp "Install Netcat-traditional (networking utility)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y netcat-traditional
-    update-alternatives --set nc /bin/nc.traditional
-    success "Netcat-traditional installed and set as default"
-fi
+success "Essential network tools installed"
 
-read -rp "Install Subfinder (subdomain discovery)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    if command -v subfinder &> /dev/null; then
-        warn "Subfinder already installed"
-    else
-        info "Installing Subfinder via Go..."
-        sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest'
-        
-        # Create symlink
-        ln -sf "$USER_HOME/go/bin/subfinder" /usr/local/bin/subfinder
-        success "Subfinder installed"
-    fi
-fi
-
-read -rp "Install Httpx (HTTP toolkit)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    if command -v httpx &> /dev/null; then
-        warn "Httpx already installed"
-    else
-        info "Installing Httpx via Go..."
-        sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest'
-        
-        # Create symlink
-        ln -sf "$USER_HOME/go/bin/httpx" /usr/local/bin/httpx
-        success "Httpx installed"
-    fi
-fi
-
-#==================#
-# Web Application
-#==================#
+#===========================================#
+#   PostgreSQL Database                    #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🗄️  PostgreSQL Database
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+info "Installing PostgreSQL..."
+apt install -y postgresql postgresql-contrib
+success "PostgreSQL installed"
+
+info "Starting and enabling PostgreSQL service..."
+systemctl enable postgresql
+systemctl start postgresql
+success "PostgreSQL service is running"
+
+#===========================================#
+#   Tor Network                            #
+#===========================================#
+section "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🧅 Tor Network Configuration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+info "Tor service should already be installed from installApps.sh"
+if ! command -v tor &> /dev/null; then
+    warn "Tor not found, installing..."
+    apt install -y tor
+    systemctl enable tor
+    systemctl start tor
+    success "Tor installed and started"
+else
+    success "Tor is already installed"
+fi
+
+#===========================================#
+#   IPTables & Firewall Configuration      #
+#===========================================#
+section "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔥 IPTables Firewall Configuration
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+info "Installing iptables and iptables-persistent..."
+apt install -y iptables iptables-persistent
+success "IPTables installed"
+
+info "Configuring IPTables rules (Tails-like configuration)..."
+
+# Backup existing rules
+iptables-save > /etc/iptables/rules.v4.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+ip6tables-save > /etc/iptables/rules.v6.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+
+# Flush existing rules
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+iptables -t mangle -F
+iptables -t mangle -X
+
+ip6tables -F
+ip6tables -X
+ip6tables -t nat -F
+ip6tables -t nat -X
+ip6tables -t mangle -F
+ip6tables -t mangle -X
+
+# Set default policies
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT DROP
+
+ip6tables -P INPUT DROP
+ip6tables -P FORWARD DROP
+ip6tables -P OUTPUT DROP
+
+# Allow loopback
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+ip6tables -A INPUT -i lo -j ACCEPT
+ip6tables -A OUTPUT -o lo -j ACCEPT
+
+# Allow established connections
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+ip6tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+ip6tables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+# Allow DNS through Tor (port 53 to Tor DNS port)
+iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+
+# Allow Tor connections
+# Tor SOCKS port (9050)
+iptables -A OUTPUT -p tcp --dport 9050 -j ACCEPT
+
+# Tor Control port (9051) - localhost only
+iptables -A OUTPUT -d 127.0.0.1 -p tcp --dport 9051 -j ACCEPT
+
+# Tor Directory servers (80, 443)
+iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+
+# Tor relay ports (9001, 9030)
+iptables -A OUTPUT -p tcp --dport 9001 -j ACCEPT
+iptables -A OUTPUT -p tcp --dport 9030 -j ACCEPT
+
+# Allow ICMP (ping) - optional, comment out for maximum privacy
+iptables -A OUTPUT -p icmp -j ACCEPT
+iptables -A INPUT -p icmp -j ACCEPT
+
+# Block all IPv6 traffic (force IPv4 through Tor)
+ip6tables -P INPUT DROP
+ip6tables -P FORWARD DROP
+ip6tables -P OUTPUT DROP
+
+# Log dropped packets (optional, for debugging)
+iptables -A INPUT -j LOG --log-prefix "IPT-INPUT-DROP: " --log-level 4
+iptables -A OUTPUT -j LOG --log-prefix "IPT-OUTPUT-DROP: " --log-level 4
+
+# Save rules
+info "Saving IPTables rules..."
+iptables-save > /etc/iptables/rules.v4
+ip6tables-save > /etc/iptables/rules.v6
+
+# Make rules persistent
+systemctl enable netfilter-persistent
+systemctl start netfilter-persistent
+
+success "IPTables configured with Tails-like rules"
+info "✓ Default policy: DROP all"
+info "✓ Loopback: ALLOWED"
+info "✓ Established connections: ALLOWED"
+info "✓ Tor connections: ALLOWED (ports 9050, 9051, 80, 443, 9001, 9030)"
+info "✓ DNS: ALLOWED"
+info "✓ IPv6: BLOCKED (all traffic)"
+info "✓ ICMP: ALLOWED (can be disabled for more privacy)"
+
+#===========================================#
+#   Network Scanning & Reconnaissance      #
+#===========================================#
+section "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔍 Network Scanning & Reconnaissance
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+info "Installing Nmap..."
+apt install -y nmap
+success "Nmap installed"
+
+info "Installing Netcat..."
+apt install -y netcat-traditional
+update-alternatives --set nc /bin/nc.traditional
+success "Netcat-traditional installed and set as default"
+
+info "Installing Subfinder (subdomain discovery)..."
+if command -v subfinder &> /dev/null; then
+    warn "Subfinder already installed"
+else
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest'
+    ln -sf "$USER_HOME/go/bin/subfinder" /usr/local/bin/subfinder
+    success "Subfinder installed"
+fi
+
+info "Installing Httpx (HTTP toolkit)..."
+if command -v httpx &> /dev/null; then
+    warn "Httpx already installed"
+else
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest'
+    ln -sf "$USER_HOME/go/bin/httpx" /usr/local/bin/httpx
+    success "Httpx installed"
+fi
+
+#===========================================#
+#   Web Application Testing                #
+#===========================================#
+section "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   🌐 Web Application Testing
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install SQLMap (SQL injection tool)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y sqlmap
-    success "SQLMap installed"
+info "Installing SQLMap..."
+apt install -y sqlmap
+success "SQLMap installed"
+
+info "Installing WPScan..."
+apt install -y wpscan
+success "WPScan installed"
+
+info "Installing Nikto..."
+apt install -y nikto
+success "Nikto installed"
+
+info "Installing Ffuf (fast web fuzzer)..."
+if command -v ffuf &> /dev/null; then
+    warn "Ffuf already installed"
+else
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install github.com/ffuf/ffuf/v2@latest'
+    ln -sf "$USER_HOME/go/bin/ffuf" /usr/local/bin/ffuf
+    success "Ffuf installed"
 fi
 
-read -rp "Install WPScan (WordPress scanner)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y wpscan
-    success "WPScan installed"
+info "Installing Gobuster..."
+apt install -y gobuster
+success "Gobuster installed"
+
+info "Installing Nuclei (vulnerability scanner)..."
+if command -v nuclei &> /dev/null; then
+    warn "Nuclei already installed"
+else
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest'
+    ln -sf "$USER_HOME/go/bin/nuclei" /usr/local/bin/nuclei
+    sudo -u $REAL_USER nuclei -update-templates
+    success "Nuclei installed and templates updated"
 fi
 
-read -rp "Install Nikto (web server scanner)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y nikto
-    success "Nikto installed"
-fi
-
-read -rp "Install Ffuf (fast web fuzzer)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    if command -v ffuf &> /dev/null; then
-        warn "Ffuf already installed"
-    else
-        info "Installing Ffuf via Go..."
-        sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install github.com/ffuf/ffuf/v2@latest'
-        
-        # Create symlink
-        ln -sf "$USER_HOME/go/bin/ffuf" /usr/local/bin/ffuf
-        success "Ffuf installed"
-    fi
-fi
-
-read -rp "Install Gobuster (directory/file brute-forcer)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y gobuster
-    success "Gobuster installed"
-fi
-
-read -rp "Install Nuclei (vulnerability scanner)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    if command -v nuclei &> /dev/null; then
-        warn "Nuclei already installed"
-    else
-        info "Installing Nuclei via Go..."
-        sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest'
-        
-        # Create symlink
-        ln -sf "$USER_HOME/go/bin/nuclei" /usr/local/bin/nuclei
-        
-        # Update nuclei templates
-        sudo -u $REAL_USER nuclei -update-templates
-        
-        success "Nuclei installed and templates updated"
-    fi
-fi
-
-#==================#
-# Wireless
-#==================#
+#===========================================#
+#   Wireless Security                      #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   📶 Wireless Security
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install Aircrack-ng suite (wireless auditing)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y aircrack-ng
-    success "Aircrack-ng installed"
+info "Installing Aircrack-ng suite..."
+apt install -y aircrack-ng
+success "Aircrack-ng installed"
+
+info "Installing Reaver (WPS attack tool)..."
+apt install -y reaver
+success "Reaver installed"
+
+info "Installing Airgeddon (wireless auditing framework)..."
+if [ -d "/opt/airgeddon" ]; then
+    warn "Airgeddon already exists in /opt/airgeddon"
+else
+    git clone --depth 1 https://github.com/v1s1t0r1sh3r3/airgeddon.git /opt/airgeddon
+    chmod +x /opt/airgeddon/airgeddon.sh
+    ln -sf /opt/airgeddon/airgeddon.sh /usr/local/bin/airgeddon
+    success "Airgeddon installed to /opt/airgeddon"
+    info "Run with: airgeddon"
 fi
 
-read -rp "Install Bully (WPS brute-force)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y bully
-    success "Bully installed"
-fi
-
-read -rp "Install Reaver (WPS attack tool)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y reaver
-    success "Reaver installed"
-fi
-
-read -rp "Install Airgeddon (wireless auditing framework)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    info "Cloning Airgeddon..."
-    if [ -d "/opt/airgeddon" ]; then
-        warn "Airgeddon already exists in /opt/airgeddon"
-    else
-        git clone --depth 1 https://github.com/v1s1t0r1sh3r3/airgeddon.git /opt/airgeddon
-        chmod +x /opt/airgeddon/airgeddon.sh
-        
-        # Create symlink
-        ln -sf /opt/airgeddon/airgeddon.sh /usr/local/bin/airgeddon
-        
-        success "Airgeddon installed to /opt/airgeddon"
-        info "Run with: airgeddon"
-    fi
-fi
-
-#==================#
-# Password Attacks
-#==================#
+#===========================================#
+#   Password Attacks                       #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🔐 Password Cracking
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🔓 Password Cracking
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install Hydra (password brute-forcer)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y hydra
-    success "Hydra installed"
-fi
+info "Installing Hydra..."
+apt install -y hydra
+success "Hydra installed"
 
-read -rp "Install John the Ripper (password cracker)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y john
-    success "John the Ripper installed"
-fi
+info "Installing John the Ripper..."
+apt install -y john
+success "John the Ripper installed"
 
-read -rp "Install CrackMapExec (network pentesting)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y crackmapexec
-    success "CrackMapExec installed"
-fi
+info "Installing CrackMapExec..."
+apt install -y crackmapexec
+success "CrackMapExec installed"
 
-#==================#
-# Privilege Escalation
-#==================#
+#===========================================#
+#   Privilege Escalation                   #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ⬆️  Privilege Escalation
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install PEASS-ng (LinPEAS/WinPEAS)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    info "Downloading PEASS-ng suite..."
-    
-    PEASS_DIR="/opt/PEASS-ng"
-    mkdir -p "$PEASS_DIR"
-    
-    if [ -d "$PEASS_DIR/.git" ]; then
-        warn "PEASS-ng already exists, updating..."
-        cd "$PEASS_DIR"
-        git pull
-    else
-        git clone https://github.com/carlospolop/PEASS-ng.git "$PEASS_DIR"
-    fi
-    
-    # Create convenient symlinks
-    ln -sf "$PEASS_DIR/linPEAS/linpeas.sh" /usr/local/bin/linpeas
-    chmod +x "$PEASS_DIR/linPEAS/linpeas.sh"
-    
-    success "PEASS-ng installed to $PEASS_DIR"
-    info "LinPEAS: linpeas or $PEASS_DIR/linPEAS/linpeas.sh"
-    info "WinPEAS: $PEASS_DIR/winPEAS/winPEASany.exe"
+info "Installing PEASS-ng (LinPEAS/WinPEAS)..."
+
+PEASS_DIR="/opt/PEASS-ng"
+mkdir -p "$PEASS_DIR"
+
+if [ -d "$PEASS_DIR/.git" ]; then
+    warn "PEASS-ng already exists, updating..."
+    cd "$PEASS_DIR"
+    git pull
+else
+    git clone https://github.com/carlospolop/PEASS-ng.git "$PEASS_DIR"
 fi
 
-#==================#
-# Exploitation
-#==================#
+ln -sf "$PEASS_DIR/linPEAS/linpeas.sh" /usr/local/bin/linpeas
+chmod +x "$PEASS_DIR/linPEAS/linpeas.sh"
+
+success "PEASS-ng installed to $PEASS_DIR"
+info "LinPEAS: linpeas or $PEASS_DIR/linPEAS/linpeas.sh"
+info "WinPEAS: $PEASS_DIR/winPEAS/winPEASany.exe"
+
+#===========================================#
+#   Exploitation Frameworks                #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   💣 Exploitation Frameworks
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install Metasploit Framework? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    if command -v msfconsole &> /dev/null; then
-        warn "Metasploit already installed"
+info "Installing Metasploit Framework..."
+if command -v msfconsole &> /dev/null; then
+    warn "Metasploit already installed"
+else
+    info "This may take a while..."
+    apt install -y metasploit-framework
+    
+    info "Initializing Metasploit database..."
+    msfdb init
+    
+    success "Metasploit Framework installed"
+    info "Run with: msfconsole"
+fi
+
+info "Installing ExploitDB & SearchSploit..."
+apt install -y exploitdb
+success "ExploitDB & SearchSploit installed"
+
+#===========================================#
+#   Network Attack Tools                   #
+#===========================================#
+section "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🌍 Network Attack Tools
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+info "Installing Bettercap..."
+apt install -y bettercap
+success "Bettercap installed"
+
+info "Installing Ettercap..."
+apt install -y ettercap-common ettercap-graphical
+success "Ettercap installed"
+
+info "Installing MITMproxy..."
+apt install -y mitmproxy
+success "MITMproxy installed"
+
+info "Installing Responder..."
+apt install -y responder
+success "Responder installed"
+
+#===========================================#
+#   Security Utilities                     #
+#===========================================#
+section "
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  🛠️  Security Utilities
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+info "Installing Macchanger..."
+apt install -y macchanger
+success "Macchanger installed"
+
+info "Installing Pypykatz (Mimikatz Python alternative)..."
+apt install -y python3-pip
+pip3 install pypykatz --break-system-packages
+success "Pypykatz installed"
+
+info "Downloading Mimikatz (Windows binary)..."
+MIMIKATZ_DIR="/opt/mimikatz"
+mkdir -p "$MIMIKATZ_DIR"
+
+if [ -f "$MIMIKATZ_DIR/mimikatz.exe" ]; then
+    warn "Mimikatz already downloaded"
+else
+    info "Fetching latest Mimikatz release..."
+    MIMIKATZ_URL=$(curl -s https://api.github.com/repos/gentilkiwi/mimikatz/releases/latest | \
+        grep "browser_download_url.*mimikatz_trunk.zip" | cut -d '"' -f 4)
+    
+    if [ -n "$MIMIKATZ_URL" ]; then
+        wget -O /tmp/mimikatz.zip "$MIMIKATZ_URL" --progress=bar:force
+        unzip -o /tmp/mimikatz.zip -d "$MIMIKATZ_DIR"
+        rm -f /tmp/mimikatz.zip
+        success "Mimikatz downloaded to $MIMIKATZ_DIR"
+        info "Usage: wine $MIMIKATZ_DIR/x64/mimikatz.exe"
     else
-        info "Installing Metasploit Framework (this may take a while)..."
-        apt install -y metasploit-framework
-        
-        # Initialize database
-        msfdb init
-        
-        success "Metasploit Framework installed"
-        info "Run with: msfconsole"
+        warn "Could not fetch Mimikatz URL automatically"
+        info "Download manually from: https://github.com/gentilkiwi/mimikatz/releases"
     fi
 fi
 
-read -rp "Install ExploitDB & SearchSploit? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y exploitdb
-    success "ExploitDB & SearchSploit installed"
-fi
+# Install wine for running Mimikatz
+info "Installing Wine (to run Mimikatz)..."
+dpkg --add-architecture i386
+apt update
+apt install -y wine wine32 wine64
+success "Wine installed"
 
-read -rp "Install Social Engineer Toolkit (SET)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y set
-    success "Social Engineer Toolkit installed"
-    info "Run with: setoolkit"
-fi
+info "Installing Impacket..."
+apt install -y python3-impacket impacket-scripts
+success "Impacket installed"
 
-#==================#
-# Post-Exploitation
-#==================#
+info "Installing Enum4linux..."
+apt install -y enum4linux
+success "Enum4linux installed"
+
+info "Installing SMB tools..."
+apt install -y smbclient smbmap
+success "SMB tools installed"
+
+#===========================================#
+#   Wordlists & Dictionaries               #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🎯 Post-Exploitation Frameworks
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-read -rp "Install Empire & Starkiller (post-exploitation)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    info "Installing Empire & Starkiller..."
-    
-    EMPIRE_DIR="/opt/Empire"
-    
-    if [ -d "$EMPIRE_DIR" ]; then
-        warn "Empire already exists in $EMPIRE_DIR"
-    else
-        # Install dependencies
-        apt install -y python3-pip docker.io docker-compose
-        
-        # Clone Empire
-        git clone --recursive https://github.com/BC-SECURITY/Empire.git "$EMPIRE_DIR"
-        cd "$EMPIRE_DIR"
-        
-        # Install Empire
-        info "Installing Empire dependencies..."
-        pip3 install -r requirements.txt --break-system-packages
-        
-        # Setup Empire
-        ./setup/install.sh
-        
-        success "Empire installed to $EMPIRE_DIR"
-        info "Start Empire server: cd $EMPIRE_DIR && ./ps-empire server"
-        info "Start Empire client: cd $EMPIRE_DIR && ./ps-empire client"
-    fi
-    
-    # Install Starkiller (GUI client)
-    read -rp "Install Starkiller (Empire GUI)? (y/n): " starkiller_ans
-    if [[ $starkiller_ans == [Yy]* ]]; then
-        info "Downloading Starkiller..."
-        
-        STARKILLER_VERSION="2.5.1"
-        STARKILLER_URL="https://github.com/BC-SECURITY/Starkiller/releases/download/v${STARKILLER_VERSION}/starkiller-${STARKILLER_VERSION}.AppImage"
-        
-        wget -O /opt/starkiller.AppImage "$STARKILLER_URL" --progress=bar:force
-        chmod +x /opt/starkiller.AppImage
-        
-        # Create desktop entry
-        cat > /usr/share/applications/starkiller.desktop <<EOF
-[Desktop Entry]
-Name=Starkiller
-Comment=Empire GUI Client
-Exec=/opt/starkiller.AppImage
-Icon=/opt/Empire/empire/server/data/empire-logo.png
-Type=Application
-Categories=Security;Network;
-EOF
-        
-        success "Starkiller installed to /opt/starkiller.AppImage"
-        info "Run with: /opt/starkiller.AppImage"
-    fi
-fi
-
-#==================#
-# Network Tools
-#==================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🌐 Network Attack Tools
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-read -rp "Install Bettercap (network attack framework)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y bettercap
-    success "Bettercap installed"
-fi
-
-read -rp "Install Ettercap (MITM tool)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y ettercap-common ettercap-graphical
-    success "Ettercap installed"
-fi
-
-read -rp "Install MITMproxy (HTTPS proxy)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y mitmproxy
-    success "MITMproxy installed"
-fi
-
-read -rp "Install Responder (LLMNR/NBT-NS poisoner)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y responder
-    success "Responder installed"
-fi
-
-#==================#
-# Utilities
-#==================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🛠️ Security Utilities
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-read -rp "Install Macchanger (MAC address spoofer)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y macchanger
-    success "Macchanger installed"
-fi
-
-read -rp "Install Mimikatz-like tool (pypykatz)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y python3-pip
-    pip3 install pypykatz --break-system-packages
-    success "Pypykatz (Mimikatz Python version) installed"
-fi
-
-read -rp "Install Impacket (network protocols toolkit)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y python3-impacket impacket-scripts
-    success "Impacket installed"
-fi
-
-read -rp "Install Enum4linux (SMB enumeration)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y enum4linux
-    success "Enum4linux installed"
-fi
-
-read -rp "Install Smbclient & Smbmap (SMB tools)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y smbclient smbmap
-    success "SMB tools installed"
-fi
-
-#==================#
-# Proxy & Traffic Analysis
-#==================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🔍 Traffic Analysis & Proxies
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-read -rp "Install Burp Suite Community (web proxy)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    if command -v burpsuite &> /dev/null; then
-        warn "Burp Suite already installed"
-    else
-        info "Downloading Burp Suite Community..."
-        
-        # Get latest version
-        BURP_URL="https://portswigger.net/burp/releases/download?product=community&type=Linux"
-        
-        wget -O /tmp/burpsuite_community.sh "$BURP_URL" --progress=bar:force
-        chmod +x /tmp/burpsuite_community.sh
-        
-        info "Installing Burp Suite (this requires GUI interaction)..."
-        /tmp/burpsuite_community.sh
-        
-        rm -f /tmp/burpsuite_community.sh
-        success "Burp Suite Community installed"
-    fi
-fi
-
-read -rp "Install OWASP ZAP (web app scanner)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y zaproxy
-    success "OWASP ZAP installed"
-fi
-
-#==================#
-# Forensics
-#==================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🔬 Forensics & Analysis
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-read -rp "Install Binwalk (firmware analysis)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y binwalk
-    success "Binwalk installed"
-fi
-
-read -rp "Install Foremost (file carving)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y foremost
-    success "Foremost installed"
-fi
-
-read -rp "Install Volatility (memory forensics)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y volatility3
-    success "Volatility3 installed"
-fi
-
-read -rp "Install Autopsy (digital forensics)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y autopsy
-    success "Autopsy installed"
-fi
-
-#==================#
-# Manual Installation Tools
-#==================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  📦 Manual Installation Tools
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-echo
-warn "The following tools require manual installation:"
-echo
-
-read -rp "Install Maltego? (requires manual download) (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    info "Maltego installation:"
-    echo "  1. Visit: https://www.maltego.com/downloads/"
-    echo "  2. Download Maltego CE (Community Edition) for Linux"
-    echo "  3. Run: chmod +x Maltego*.run && ./Maltego*.run"
-    read -p "Press Enter when ready to continue..."
-fi
-
-echo
-read -rp "Setup C2 Framework installation guide? (Havoc/Sliver/Mythic) (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    C2_GUIDE="/opt/c2-installation-guide.txt"
-    
-    cat > "$C2_GUIDE" <<'C2EOF'
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-         C2 Framework Installation Guide
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-⚠️  WARNING: These are advanced offensive security tools.
-   Use only in authorized environments!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. HAVOC C2 Framework
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-GitHub: https://github.com/HavocFramework/Havoc
-
-Installation:
-```bash
-cd /opt
-git clone https://github.com/HavocFramework/Havoc.git
-cd Havoc
-make install-all
-```
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2. SLIVER C2 Framework
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-GitHub: https://github.com/BishopFox/sliver
-
-Installation:
-```bash
-curl https://sliver.sh/install | sudo bash
-```
-
-Usage:
-```bash
-sliver-server
-```
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-3. MYTHIC C2 Framework
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-GitHub: https://github.com/its-a-feature/Mythic
-
-Requirements:
-- Docker & Docker Compose
-
-Installation:
-```bash
-cd /opt
-git clone https://github.com/its-a-feature/Mythic
-cd Mythic
-./install_docker_ubuntu.sh
-make
-./mythic-cli start
-```
-
-Access: https://127.0.0.1:7443
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4. COBALT STRIKE (Commercial - Not Recommended)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Note: Cobalt Strike is a commercial product ($3,500/year)
-Website: https://www.cobaltstrike.com/
-
-Alternatives (Free):
-- Havoc (similar UI to Cobalt Strike)
-- Sliver (modern, active development)
-- Mythic (modular, extensible)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-C2EOF
-
-    success "C2 installation guide saved to: $C2_GUIDE"
-    info "View with: cat $C2_GUIDE"
-fi
-
-#==================#
-# Wordlists
-#==================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   📚 Wordlists & Dictionaries
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-read -rp "Install SecLists (wordlist collection)? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y seclists
-    success "SecLists installed to /usr/share/seclists"
-fi
+info "Installing SecLists..."
+apt install -y seclists
+success "SecLists installed to /usr/share/seclists"
 
-read -rp "Install Wordlists package? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    apt install -y wordlists
-    success "Wordlists installed to /usr/share/wordlists"
-fi
+info "Installing Wordlists package..."
+apt install -y wordlists
+success "Wordlists installed to /usr/share/wordlists"
 
-read -rp "Download RockYou wordlist? (y/n): " answer
-if [[ $answer == [Yy]* ]]; then
-    ROCKYOU_DIR="/usr/share/wordlists"
-    mkdir -p "$ROCKYOU_DIR"
-    
-    if [ -f "$ROCKYOU_DIR/rockyou.txt" ]; then
-        warn "RockYou already exists"
+info "Extracting RockYou wordlist..."
+ROCKYOU_DIR="/usr/share/wordlists"
+mkdir -p "$ROCKYOU_DIR"
+
+if [ -f "$ROCKYOU_DIR/rockyou.txt" ]; then
+    warn "RockYou already extracted"
+else
+    if [ -f "/usr/share/wordlists/rockyou.txt.gz" ]; then
+        gunzip -k /usr/share/wordlists/rockyou.txt.gz
+        success "RockYou wordlist extracted"
     else
-        info "Extracting RockYou wordlist..."
-        gunzip -k /usr/share/wordlists/rockyou.txt.gz 2>/dev/null || \
-        wget -O "$ROCKYOU_DIR/rockyou.txt.gz" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt && \
+        info "Downloading RockYou wordlist..."
+        wget -O "$ROCKYOU_DIR/rockyou.txt.gz" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
         gunzip "$ROCKYOU_DIR/rockyou.txt.gz"
-        success "RockYou wordlist extracted to $ROCKYOU_DIR/rockyou.txt"
+        success "RockYou wordlist downloaded and extracted"
     fi
 fi
 
-#==================#
-# Post-Install Configuration
-#==================#
+#===========================================#
+#   Post-Install Configuration             #
+#===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ⚙️  Post-Installation Configuration
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Create tools directory
 TOOLS_DIR="/opt/security-tools"
 mkdir -p "$TOOLS_DIR"
 chown -R $REAL_USER:$REAL_USER "$TOOLS_DIR"
 
 info "Security tools directory created: $TOOLS_DIR"
 
-# Create aliases for common tools
+# Create aliases
 ALIASES_FILE="$USER_HOME/.security_aliases"
 
 cat > "$ALIASES_FILE" <<'ALIASEOF'
@@ -676,13 +540,11 @@ alias wifi-stop='airmon-ng stop wlan0mon'
 alias hydra-ssh='hydra -L users.txt -P pass.txt ssh://'
 alias crack-hash='john --wordlist=rockyou.txt'
 alias priv-esc='linpeas'
-alias empire-server='cd /opt/Empire && ./ps-empire server'
-alias empire-client='cd /opt/Empire && ./ps-empire client'
 ALIASEOF
 
 chown $REAL_USER:$REAL_USER "$ALIASES_FILE"
 
-# Add to bashrc/zshrc
+# Add to shell profiles
 for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
     if [ -f "$rc_file" ] && ! grep -q "security_aliases" "$rc_file"; then
         echo "[ -f ~/.security_aliases ] && source ~/.security_aliases" >> "$rc_file"
@@ -691,158 +553,101 @@ done
 
 success "Security aliases created: $ALIASES_FILE"
 
-#==================#
-# Summary
-#==================#
+#===========================================#
+#   Summary                                #
+#===========================================#
 echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 success "✅ Security Tools Installation Complete!"
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
 info "📋 Installed Tools Summary:"
 echo
+echo "🌐 Essential Network Tools:"
+echo "  ✓ wget, curl, net-tools, dnsutils"
+echo
+echo "🗄️  Database:"
+echo "  ✓ PostgreSQL (running)"
+echo
+echo "🔥 Firewall & Privacy:"
+echo "  ✓ IPTables (Tails-like configuration)"
+echo "  ✓ Tor Network (integrated)"
+echo
 echo "🔍 Reconnaissance & Scanning:"
-echo "  • Nmap - Network scanner"
-echo "  • Subfinder - Subdomain discovery"
-echo "  • Httpx - HTTP toolkit"
-echo "  • Netcat - Networking utility"
+echo "  ✓ Nmap, Netcat, Subfinder, Httpx"
 echo
 echo "🌐 Web Application Testing:"
-echo "  • SQLMap - SQL injection"
-echo "  • WPScan - WordPress scanner"
-echo "  • Nikto - Web server scanner"
-echo "  • Ffuf - Fast web fuzzer"
-echo "  • Gobuster - Directory brute-forcer"
-echo "  • Nuclei - Vulnerability scanner"
+echo "  ✓ SQLMap, WPScan, Nikto, Ffuf, Gobuster, Nuclei"
 echo
 echo "📶 Wireless Security:"
-echo "  • Aircrack-ng - Wireless auditing suite"
-echo "  • Bully - WPS brute-force"
-echo "  • Reaver - WPS attacks"
-echo "  • Airgeddon - Wireless framework"
+echo "  ✓ Aircrack-ng, Reaver, Airgeddon"
 echo
-echo "🔐 Password & Authentication:"
-echo "  • Hydra - Password brute-forcer"
-echo "  • John the Ripper - Password cracker"
-echo "  • CrackMapExec - Network pentesting"
+echo "🔓 Password & Authentication:"
+echo "  ✓ Hydra, John the Ripper, CrackMapExec"
 echo
 echo "⬆️  Privilege Escalation:"
-echo "  • PEASS-ng (LinPEAS/WinPEAS)"
+echo "  ✓ PEASS-ng (LinPEAS/WinPEAS)"
 echo
 echo "💣 Exploitation:"
-echo "  • Metasploit Framework"
-echo "  • ExploitDB & SearchSploit"
-echo "  • Social Engineer Toolkit (SET)"
+echo "  ✓ Metasploit Framework, ExploitDB"
 echo
-echo "🎯 Post-Exploitation:"
-echo "  • Empire & Starkiller"
-echo
-echo "🌐 Network Attacks:"
-echo "  • Bettercap - Network attack framework"
-echo "  • Ettercap - MITM tool"
-echo "  • MITMproxy - HTTPS proxy"
-echo "  • Responder - LLMNR/NBT-NS poisoner"
+echo "🌍 Network Attacks:"
+echo "  ✓ Bettercap, Ettercap, MITMproxy, Responder"
 echo
 echo "🛠️  Utilities:"
-echo "  • Macchanger - MAC spoofer"
-echo "  • Pypykatz - Mimikatz alternative"
-echo "  • Impacket - Network protocols"
-echo "  • Enum4linux - SMB enumeration"
+echo "  ✓ Macchanger, Pypykatz, Mimikatz, Impacket, Enum4linux, SMB tools, Wine"
 echo
-echo "🔍 Traffic Analysis:"
-echo "  • Burp Suite Community"
-echo "  • OWASP ZAP"
+echo "📚 Wordlists:"
+echo "  ✓ SecLists, Wordlists, RockYou"
 echo
-echo "🔬 Forensics:"
-echo "  • Binwalk - Firmware analysis"
-echo "  • Foremost - File carving"
-echo "  • Volatility - Memory forensics"
-echo "  • Autopsy - Digital forensics"
+section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "🔥 IPTables Configuration:"
+echo "  ✓ Default policy: DROP all traffic"
+echo "  ✓ Tor connections: ALLOWED"
+echo "  ✓ IPv6: BLOCKED (forces IPv4 through Tor)"
+echo "  ✓ Established connections: ALLOWED"
+echo "  ✓ Similar to Tails OS firewall setup"
 echo
-info "📝 Common Commands (via aliases):"
+info "🎯 Quick Test Commands:"
 echo
-echo "  • msf                  → Launch Metasploit"
-echo "  • search-exploit       → Search ExploitDB"
-echo "  • port-scan <target>   → Nmap scan with service detection"
-echo "  • vuln-scan <target>   → Nuclei vulnerability scan"
-echo "  • fuzz <wordlist>      → Ffuf fuzzing"
-echo "  • subdomain <domain>   → Subfinder subdomain discovery"
-echo "  • http-probe <file>    → Httpx probe URLs"
-echo "  • wifi-mon             → Enable monitor mode"
-echo "  • priv-esc             → Run LinPEAS"
-echo "  • empire-server        → Start Empire server"
-echo "  • empire-client        → Start Empire client"
+echo "  Check Tor IP:        curl --socks5 127.0.0.1:9050 https://check.torproject.org/api/ip"
+echo "  Port scan:           nmap -sV -sC <target>"
+echo "  Vulnerability scan:  nuclei -u <url>"
+echo "  Directory fuzzing:   ffuf -w wordlist.txt -u URL/FUZZ"
+echo "  Subdomain discovery: subfinder -d example.com"
+echo "  HTTP probing:        httpx -l subdomains.txt"
+echo "  Metasploit:          msfconsole"
+echo "  WiFi monitor mode:   airmon-ng start wlan0"
+echo "  Password cracking:   john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt"
+echo "  Mimikatz:            wine /opt/mimikatz/x64/mimikatz.exe"
 echo
-info "🔧 Direct Commands:"
+info "📂 Important Paths:"
+echo "  • Security tools:     /opt/security-tools"
+echo "  • PEASS-ng:           /opt/PEASS-ng"
+echo "  • Mimikatz:           /opt/mimikatz"
+echo "  • Airgeddon:          /opt/airgeddon"
+echo "  • SecLists:           /usr/share/seclists"
+echo "  • Wordlists:          /usr/share/wordlists"
+echo "  • RockYou:            /usr/share/wordlists/rockyou.txt"
+echo "  • Security aliases:   ~/.security_aliases"
 echo
-echo "  • nuclei -u <url>                    → Scan single target"
-echo "  • nuclei -l urls.txt                 → Scan multiple targets"
-echo "  • ffuf -w wordlist.txt -u URL/FUZZ   → Directory fuzzing"
-echo "  • subfinder -d example.com           → Find subdomains"
-echo "  • httpx -l subdomains.txt            → Probe HTTP services"
-echo "  • nmap -sV -sC <target>              → Service version scan"
-echo "  • hydra -L users.txt -P pass.txt <service>://<target>"
-echo "  • john --wordlist=rockyou.txt hash.txt"
-echo "  • sqlmap -u <url> --dbs              → Enumerate databases"
-echo "  • wpscan --url <target>              → Scan WordPress site"
-echo "  • airmon-ng start wlan0              → Enable monitor mode"
-echo "  • linpeas                            → Linux privilege escalation"
-echo "  • /opt/Empire/ps-empire server       → Empire server"
-echo "  • /opt/starkiller.AppImage           → Starkiller GUI"
-echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo
-warn "⚠️  CRITICAL SECURITY REMINDERS:"
+warn "⚠️  CRITICAL REMINDERS:"
 echo
 echo "  1. ✅ ALWAYS get written authorization before testing"
 echo "  2. 🚫 NEVER use these tools on systems you don't own"
 echo "  3. 📜 Unauthorized access is ILLEGAL in most countries"
 echo "  4. 🎓 Use for learning in controlled lab environments"
-echo "  5. 📖 Read tool documentation before use"
-echo "  6. 🔒 Keep tools updated regularly"
-echo "  7. 💾 Document all authorized testing activities"
-echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo
-info "📚 Learning Resources:"
-echo
-echo "  • Exploit-DB:         https://www.exploit-db.com"
-echo "  • HackTricks:         https://book.hacktricks.xyz"
-echo "  • OWASP:              https://owasp.org"
-echo "  • Metasploit:         https://www.offensive-security.com/metasploit-unleashed"
-echo "  • TryHackMe:          https://tryhackme.com"
-echo "  • HackTheBox:         https://www.hackthebox.com"
-echo "  • PortSwigger Academy: https://portswigger.net/web-security"
-echo "  • PentesterLab:       https://pentesterlab.com"
-echo
-info "🗂️  Important Paths:"
-echo
-echo "  • Security tools:     /opt/security-tools"
-echo "  • PEASS-ng:           /opt/PEASS-ng"
-echo "  • Empire:             /opt/Empire"
-echo "  • Starkiller:         /opt/starkiller.AppImage"
-echo "  • Airgeddon:          /opt/airgeddon"
-echo "  • SecLists:           /usr/share/seclists"
-echo "  • Wordlists:          /usr/share/wordlists"
-echo "  • RockYou:            /usr/share/wordlists/rockyou.txt"
-echo "  • C2 Guide:           /opt/c2-installation-guide.txt"
-echo "  • Security aliases:   ~/.security_aliases"
-echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  5. 🔥 IPTables rules active - traffic routed through Tor by default"
+echo "  6. 📖 Read tool documentation before use"
 echo
 info "🔄 Next Steps:"
-echo
 echo "  1. Restart your terminal to load aliases"
 echo "  2. Update Nuclei templates: nuclei -update-templates"
 echo "  3. Initialize Metasploit database: msfdb init"
-echo "  4. Test Empire setup: empire-server"
-echo "  5. Review C2 installation guide: cat /opt/c2-installation-guide.txt"
-echo
-warn "⚠️  Some tools may require additional configuration"
-warn "⚠️  Check individual tool documentation for setup details"
+echo "  4. Test Tor connection: curl --socks5 127.0.0.1:9050 https://check.torproject.org"
+echo "  5. Review IPTables rules: iptables -L -v"
 echo
 success "🎉 Happy (Ethical) Hacking!"
 echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
