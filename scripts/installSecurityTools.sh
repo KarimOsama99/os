@@ -109,107 +109,250 @@ fi
 #   IPTables & Firewall Configuration      #
 #===========================================#
 section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+┌──────────────────────────────────────────┐
   🔥 IPTables Firewall Configuration
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+└──────────────────────────────────────────┘"
 
 info "Installing iptables and iptables-persistent..."
 apt install -y iptables iptables-persistent
 success "IPTables installed"
 
-info "Configuring IPTables rules (Tails-like configuration)..."
+echo
+info "Choose IPTables security level:"
+echo
+echo "1) ${GREEN}Basic${RESET}      - Permissive (allows most traffic, blocks common threats)"
+echo "2) ${YELLOW}Medium${RESET}     - Balanced (recommended for daily use)"
+echo "3) ${RED}Tails-like${RESET} - Strict (maximum privacy, force Tor routing)"
+echo "4) ${CYAN}Custom${RESET}     - Configure manually"
+echo "5) ${BLUE}Skip${RESET}       - Don't configure firewall"
+echo
 
-# Backup existing rules
-iptables-save > /etc/iptables/rules.v4.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
-ip6tables-save > /etc/iptables/rules.v6.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+read -rp "Select security level [1-5]: " iptables_level
 
-# Flush existing rules
-iptables -F
-iptables -X
-iptables -t nat -F
-iptables -t nat -X
-iptables -t mangle -F
-iptables -t mangle -X
-
-ip6tables -F
-ip6tables -X
-ip6tables -t nat -F
-ip6tables -t nat -X
-ip6tables -t mangle -F
-ip6tables -t mangle -X
-
-# Set default policies
-iptables -P INPUT DROP
-iptables -P FORWARD DROP
-iptables -P OUTPUT DROP
-
-ip6tables -P INPUT DROP
-ip6tables -P FORWARD DROP
-ip6tables -P OUTPUT DROP
-
-# Allow loopback
-iptables -A INPUT -i lo -j ACCEPT
-iptables -A OUTPUT -o lo -j ACCEPT
-
-ip6tables -A INPUT -i lo -j ACCEPT
-ip6tables -A OUTPUT -o lo -j ACCEPT
-
-# Allow established connections
-iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-ip6tables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-ip6tables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# Allow DNS through Tor (port 53 to Tor DNS port)
-iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
-
-# Allow Tor connections
-# Tor SOCKS port (9050)
-iptables -A OUTPUT -p tcp --dport 9050 -j ACCEPT
-
-# Tor Control port (9051) - localhost only
-iptables -A OUTPUT -d 127.0.0.1 -p tcp --dport 9051 -j ACCEPT
-
-# Tor Directory servers (80, 443)
-iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
-
-# Tor relay ports (9001, 9030)
-iptables -A OUTPUT -p tcp --dport 9001 -j ACCEPT
-iptables -A OUTPUT -p tcp --dport 9030 -j ACCEPT
-
-# Allow ICMP (ping) - optional, comment out for maximum privacy
-iptables -A OUTPUT -p icmp -j ACCEPT
-iptables -A INPUT -p icmp -j ACCEPT
-
-# Block all IPv6 traffic (force IPv4 through Tor)
-ip6tables -P INPUT DROP
-ip6tables -P FORWARD DROP
-ip6tables -P OUTPUT DROP
-
-# Log dropped packets (optional, for debugging)
-iptables -A INPUT -j LOG --log-prefix "IPT-INPUT-DROP: " --log-level 4
-iptables -A OUTPUT -j LOG --log-prefix "IPT-OUTPUT-DROP: " --log-level 4
-
-# Save rules
-info "Saving IPTables rules..."
-iptables-save > /etc/iptables/rules.v4
-ip6tables-save > /etc/iptables/rules.v6
-
-# Make rules persistent
-systemctl enable netfilter-persistent
-systemctl start netfilter-persistent
-
-success "IPTables configured with Tails-like rules"
-info "✓ Default policy: DROP all"
-info "✓ Loopback: ALLOWED"
-info "✓ Established connections: ALLOWED"
-info "✓ Tor connections: ALLOWED (ports 9050, 9051, 80, 443, 9001, 9030)"
-info "✓ DNS: ALLOWED"
-info "✓ IPv6: BLOCKED (all traffic)"
-info "✓ ICMP: ALLOWED (can be disabled for more privacy)"
+case $iptables_level in
+    5)
+        info "Skipping IPTables configuration"
+        ;;
+    *)
+        info "Configuring IPTables rules..."
+        
+        # Backup existing rules
+        iptables-save > /etc/iptables/rules.v4.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+        ip6tables-save > /etc/iptables/rules.v6.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+        
+        # Flush existing rules
+        iptables -F
+        iptables -X
+        iptables -t nat -F
+        iptables -t nat -X
+        iptables -t mangle -F
+        iptables -t mangle -X
+        
+        ip6tables -F
+        ip6tables -X
+        ip6tables -t nat -F
+        ip6tables -t nat -X
+        ip6tables -t mangle -F
+        ip6tables -t mangle -X
+        
+        # ════════════════════════════════════════
+        # Apply rules based on security level
+        # ════════════════════════════════════════
+        
+        case $iptables_level in
+            1) # BASIC - Permissive
+                info "Applying BASIC security rules..."
+                
+                # Default policies - ACCEPT
+                iptables -P INPUT ACCEPT
+                iptables -P FORWARD DROP
+                iptables -P OUTPUT ACCEPT
+                
+                ip6tables -P INPUT ACCEPT
+                ip6tables -P FORWARD DROP
+                ip6tables -P OUTPUT ACCEPT
+                
+                # Block common attacks
+                iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
+                iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+                iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+                
+                # Rate limiting SSH
+                iptables -A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -m recent --set
+                iptables -A INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -m recent --update --seconds 60 --hitcount 4 -j DROP
+                
+                success "BASIC rules applied"
+                ;;
+                
+            2) # MEDIUM - Balanced (RECOMMENDED)
+                info "Applying MEDIUM security rules (Recommended)..."
+                
+                # Default policies
+                iptables -P INPUT DROP
+                iptables -P FORWARD DROP
+                iptables -P OUTPUT ACCEPT
+                
+                # IPv6 - more restrictive
+                ip6tables -P INPUT DROP
+                ip6tables -P FORWARD DROP
+                ip6tables -P OUTPUT ACCEPT
+                
+                # Allow loopback
+                iptables -A INPUT -i lo -j ACCEPT
+                iptables -A OUTPUT -o lo -j ACCEPT
+                
+                ip6tables -A INPUT -i lo -j ACCEPT
+                ip6tables -A OUTPUT -o lo -j ACCEPT
+                
+                # Allow established connections
+                iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                
+                ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                ip6tables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                
+                # Allow DNS
+                iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+                iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+                
+                # Allow HTTP/HTTPS
+                iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+                iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+                
+                # Allow SSH outbound
+                iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+                
+                # Allow ICMP (ping) - limited
+                iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
+                iptables -A OUTPUT -p icmp -j ACCEPT
+                
+                # Block invalid packets
+                iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
+                
+                # Protection against port scanning
+                iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+                iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+                
+                success "MEDIUM rules applied (Recommended for daily use)"
+                ;;
+                
+            3) # TAILS-LIKE - Strict
+                info "Applying TAILS-LIKE security rules (Strict)..."
+                
+                # Default policies - DROP everything
+                iptables -P INPUT DROP
+                iptables -P FORWARD DROP
+                iptables -P OUTPUT DROP
+                
+                # Block ALL IPv6 (force IPv4 through Tor)
+                ip6tables -P INPUT DROP
+                ip6tables -P FORWARD DROP
+                ip6tables -P OUTPUT DROP
+                
+                # Allow loopback
+                iptables -A INPUT -i lo -j ACCEPT
+                iptables -A OUTPUT -o lo -j ACCEPT
+                
+                # Allow established connections
+                iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                
+                # Allow DNS through Tor
+                iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+                iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+                
+                # Allow Tor connections
+                # Tor SOCKS port (9050)
+                iptables -A OUTPUT -p tcp --dport 9050 -j ACCEPT
+                
+                # Tor Control port (9051) - localhost only
+                iptables -A OUTPUT -d 127.0.0.1 -p tcp --dport 9051 -j ACCEPT
+                
+                # Tor Directory servers (80, 443)
+                iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+                iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+                
+                # Tor relay ports (9001, 9030)
+                iptables -A OUTPUT -p tcp --dport 9001 -j ACCEPT
+                iptables -A OUTPUT -p tcp --dport 9030 -j ACCEPT
+                
+                # OPTIONAL: Allow ICMP (comment out for maximum privacy)
+                # iptables -A OUTPUT -p icmp -j ACCEPT
+                # iptables -A INPUT -p icmp -j ACCEPT
+                
+                # Log dropped packets (for debugging)
+                iptables -A INPUT -j LOG --log-prefix "IPT-INPUT-DROP: " --log-level 4
+                iptables -A OUTPUT -j LOG --log-prefix "IPT-OUTPUT-DROP: " --log-level 4
+                
+                warn "⚠️  STRICT MODE ENABLED!"
+                warn "⚠️  All traffic MUST go through Tor"
+                warn "⚠️  Regular internet apps may not work"
+                success "TAILS-LIKE rules applied"
+                ;;
+                
+            4) # CUSTOM
+                info "Custom configuration - please edit /etc/iptables/rules.v4 manually"
+                success "IPTables installed, configure manually"
+                ;;
+        esac
+        
+        # Save rules if configured
+        if [ "$iptables_level" != "4" ]; then
+            info "Saving IPTables rules..."
+            iptables-save > /etc/iptables/rules.v4
+            ip6tables-save > /etc/iptables/rules.v6
+            
+            # Make rules persistent
+            systemctl enable netfilter-persistent
+            systemctl start netfilter-persistent
+            
+            success "IPTables rules saved and will persist after reboot"
+            
+            # Display summary
+            echo
+            info "📊 IPTables Configuration Summary:"
+            echo
+            case $iptables_level in
+                1)
+                    echo "  🟢 Security Level: BASIC (Permissive)"
+                    echo "  ✓ Default policy: ACCEPT (input/output)"
+                    echo "  ✓ Blocks: Invalid packets, port scans"
+                    echo "  ✓ Rate limits: SSH connections"
+                    echo "  ✓ Allows: All normal traffic"
+                    ;;
+                2)
+                    echo "  🟡 Security Level: MEDIUM (Balanced) ⭐ RECOMMENDED"
+                    echo "  ✓ Default INPUT: DROP"
+                    echo "  ✓ Default OUTPUT: ACCEPT"
+                    echo "  ✓ Allows: HTTP, HTTPS, DNS, SSH, established connections"
+                    echo "  ✓ Blocks: Unsolicited inbound, invalid packets"
+                    echo "  ✓ IPv6: More restrictive"
+                    ;;
+                3)
+                    echo "  🔴 Security Level: TAILS-LIKE (Strict)"
+                    echo "  ✓ Default policy: DROP ALL"
+                    echo "  ✓ IPv6: COMPLETELY BLOCKED"
+                    echo "  ✓ Allows ONLY: Tor connections (9050, 9051, 80, 443, 9001, 9030)"
+                    echo "  ✓ DNS: Allowed"
+                    echo "  ✓ Logging: Enabled for dropped packets"
+                    echo "  ⚠️  WARNING: Only Tor traffic allowed!"
+                    ;;
+            esac
+            echo
+            
+            # Show commands to manage rules
+            info "🛠️  Manage IPTables:"
+            echo
+            echo "  View rules:      ${CYAN}sudo iptables -L -v -n${RESET}"
+            echo "  View IPv6 rules: ${CYAN}sudo ip6tables -L -v -n${RESET}"
+            echo "  Restore backup:  ${CYAN}sudo iptables-restore < /etc/iptables/rules.v4.backup.*${RESET}"
+            echo "  Edit rules:      ${CYAN}sudo nano /etc/iptables/rules.v4${RESET}"
+            echo "  Reload rules:    ${CYAN}sudo systemctl restart netfilter-persistent${RESET}"
+            echo "  Disable firewall: ${CYAN}sudo systemctl stop netfilter-persistent${RESET}"
+            echo
+        fi
+        ;;
+esac
 
 #===========================================#
 #   Network Scanning & Reconnaissance      #
