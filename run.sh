@@ -77,19 +77,19 @@ log() {
 # --- Ordered list: "script|description|default"
 SCRIPTS=(
     "systemUpdate.sh|Update system and install base tools|Y"
-    "installWallpapers.sh|Install WOLF OS wallpapers|Y"
-    "installFirefox.sh|Install Firefox browser|Y"
-    "installApps.sh|Install applications (Browsers, IDE, Media, etc)|Y"
-    "installSecurityTools.sh|Install security & penetration testing tools|N"
-    "installFonts.sh|Install system fonts (Arabic + English)|Y"
-    "installIcons.sh|Install icon themes (Papirus/Flat Remix)|Y"
-    "installNeofetch.sh|Configure Neofetch with WOLF OS theme|Y"
-    "installPlymouth.sh|Install and configure Plymouth boot theme|Y"
-    "installGrubTheme.sh|Install and configure GRUB theme|Y"
+    "installFonts.sh|Install system fonts|Y"
+    "installIcons.sh|Install icon themes|Y"
     "catppuccinGTK.sh|Install Catppuccin GTK theme|Y"
     "catppuccinQT.sh|Install Catppuccin QT theme|Y"
     "bibataCursor.sh|Install Bibata cursor theme|Y"
+    "installWallpapers.sh|Install WOLF OS wallpapers|Y"
+    "installFirefox.sh|Install Firefox browser|Y"
+    "installApps.sh|Install applications|Y"
+    "installSecurityTools.sh|Install security tools|N"
     "zshrc.sh|Configure Zsh with Oh My Zsh and plugins|Y"
+    "installNeofetch.sh|Configure Neofetch with WOLF OS theme|Y"
+    "installPlymouth.sh|Install Plymouth boot theme|Y"
+    "installGrubTheme.sh|Install GRUB theme|Y"
     "finalSetup.sh|Final system configuration and cleanup|Y"
 )
 
@@ -117,7 +117,7 @@ cat << "EOF"
 ║       ╚███╔███╔╝╚██████╔╝███████╗██║         ╚██████╔╝███████║               ║
 ║        ╚══╝╚══╝  ╚═════╝ ╚══════╝╚═╝          ╚═════╝ ╚══════╝               ║
 ║                                                                              ║
-║              ⚡ Debian 13 Sway Setup & Configuration Tool ⚡                 ║
+║              ⚡ Debian 13 Pro Setup & Configuration Tools ⚡                 ║
 ║                                                                              ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 EOF

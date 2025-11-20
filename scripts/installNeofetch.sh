@@ -307,6 +307,32 @@ chown $REAL_USER:$REAL_USER "$WRAPPER_SCRIPT"
 success "Neofetch wrapper created at ~/.local/bin/neofetch"
 
 #===========================================#
+#   Ensure ~/.local/bin in PATH            #
+#===========================================#
+info "Ensuring ~/.local/bin is in PATH..."
+
+for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
+    if [ -f "$rc_file" ]; then
+        # Check if PATH already includes ~/.local/bin
+        if ! grep -q 'PATH.*\.local/bin' "$rc_file" 2>/dev/null; then
+            cat >> "$rc_file" <<'PATHEOF'
+
+# Add ~/.local/bin to PATH for user scripts
+export PATH="$HOME/.local/bin:$PATH"
+PATHEOF
+            success "Added ~/.local/bin to PATH in $(basename $rc_file)"
+        else
+            info "PATH already includes ~/.local/bin in $(basename $rc_file)"
+        fi
+    fi
+done
+
+# Export for current session
+export PATH="$USER_HOME/.local/bin:$PATH"
+
+success "PATH configuration complete"
+
+#===========================================#
 #   Shell Integration (اختياري)           #
 #===========================================#
 echo

@@ -359,6 +359,10 @@ alias free='free -h'
 alias ports='sudo netstat -tulanp'
 alias myip='curl -s ifconfig.me'
 
+if [ -f "$HOME/.local/bin/neofetch" ]; then
+    alias neofetch='$HOME/.local/bin/neofetch'
+fi
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Development
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
