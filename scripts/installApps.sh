@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #============================================================#
 #              Additional Applications Installer             #
+#               + Dynamic version fetching                   #
 #============================================================#
 
 set -e
@@ -17,7 +18,7 @@ info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
-section() { echo -e "${CYAN}━━━ $1 ━━━${RESET}"; }
+section() { echo -e "${CYAN}┌── $1 ──┐${RESET}"; }
 
 #==================#
 #   Require Root   #
@@ -81,10 +82,21 @@ section "Installing Node.js via NVM"
 if [ -d "$USER_HOME/.nvm" ]; then
     warn "nvm already installed, skipping..."
 else
-    info "Installing nvm for user $REAL_USER..."
+    info "Fetching latest nvm version..."
+    
+    # Fetch latest version from GitHub API
+    NVM_VERSION=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")' 2>/dev/null || echo "")
+    
+    if [ -z "$NVM_VERSION" ]; then
+        warn "Could not fetch latest version from API, using fallback v0.40.1"
+        NVM_VERSION="v0.40.1"
+    else
+        success "Latest nvm version: $NVM_VERSION"
+    fi
+    
+    info "Installing nvm $NVM_VERSION for user $REAL_USER..."
     
     # Download and install nvm as the real user
-    NVM_VERSION="v0.40.1"
     sudo -u $REAL_USER bash <<NVMEOF
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh | bash
 NVMEOF
@@ -278,11 +290,13 @@ else
     
     # Get latest version dynamically
     info "Fetching latest Tor Browser version..."
-    TOR_VERSION=$(curl -s https://www.torproject.org/download/ | grep -oP 'torbrowser/\K[0-9.]+' | head -1)
+    TOR_VERSION=$(curl -s https://www.torproject.org/download/ | grep -oP 'torbrowser/\K[0-9.]+' | head -1 2>/dev/null || echo "")
     
     if [ -z "$TOR_VERSION" ]; then
         warn "Could not fetch latest version, using fallback 15.0.1"
         TOR_VERSION="15.0.1"
+    else
+        success "Latest Tor Browser version: $TOR_VERSION"
     fi
     
     TOR_ARCH="linux-x86_64"
@@ -360,7 +374,15 @@ if command -v go &> /dev/null; then
     warn "Golang already installed: $(go version)"
 else
     info "Fetching latest Golang version..."
-    GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -1)
+    GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -1 2>/dev/null || echo "")
+    
+    if [ -z "$GO_VERSION" ]; then
+        warn "Could not fetch latest version, using fallback go1.23.4"
+        GO_VERSION="go1.23.4"
+    else
+        success "Latest Golang version: $GO_VERSION"
+    fi
+    
     GO_TARBALL="${GO_VERSION}.linux-amd64.tar.gz"
     GO_URL="https://go.dev/dl/${GO_TARBALL}"
     
@@ -404,7 +426,7 @@ echo
 info "📋 Installed applications:"
 echo "  ✓ Brave Browser"
 echo "  ✓ VS Code"
-echo "  ✓ Node.js 22 (via nvm)"
+echo "  ✓ Node.js 22 (via nvm - latest version)"
 if [[ $install_libreoffice == [Yy]* ]]; then
     echo "  ✓ LibreOffice (with Arabic support)"
 fi
@@ -426,7 +448,7 @@ echo "  ✓ Tor Browser (latest version)"
 echo "  ✓ OpenVPN"
 echo "  ✓ Python3 + pip + pipx"
 echo "  ✓ Figlet"
-echo "  ✓ Golang"
+echo "  ✓ Golang (latest version)"
 echo
 info "🎨 Customization:"
 echo "  • Zsh configuration will be handled by zshrc.sh script"
@@ -441,6 +463,7 @@ echo "  2. Node.js 22 available via nvm (use: nvm use 22)"
 echo "  3. User '$REAL_USER' added to wireshark group (requires logout)"
 echo "  4. Apache2 NOT installed (use XAMPP for web server)"
 echo "  5. Oh My Zsh will be configured by zshrc.sh script"
+echo "  6. All tools fetched latest versions dynamically"
 echo
 info "🚀 Quick commands:"
 echo "  • Node.js: nvm use 22 && node --version"

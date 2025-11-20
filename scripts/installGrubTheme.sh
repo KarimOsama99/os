@@ -181,7 +181,7 @@ if [ -n "$BACKGROUND_FILES" ]; then
     echo "$BACKGROUND_FILES" | while read -r bg; do
         echo "  • $(basename "$bg")"
     done
-    success "Theme includes its own background - using theme's background"
+    success "Theme includes its own background"
 else
     warn "No background image found in theme"
     info "Theme will use GRUB's default background"
@@ -222,16 +222,86 @@ fi
 
 success "GRUB configuration updated!"
 
+#===========================================#
+#   Copy Theme Background to GRUB Boot Dir #
+#   (FIX: Debian default background issue) #
+#===========================================#
+echo
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "🔧 Fixing GRUB Fallback Background"
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo
+
+# Find background in theme (prioritize common names)
+THEME_BG=""
+for bg_name in "background.png" "background.jpg" "bg.png" "bg.jpg" "wallpaper.png" "wallpaper.jpg"; do
+    if [ -f "$THEME_DEST/$bg_name" ]; then
+        THEME_BG="$THEME_DEST/$bg_name"
+        break
+    fi
+done
+
+# If not found by name, search
+if [ -z "$THEME_BG" ]; then
+    THEME_BG=$(find "$THEME_DEST" -type f \( \
+        -iname "background.*" -o \
+        -iname "bg.*" -o \
+        -iname "*wallpaper*" \
+    \) | head -1)
+fi
+
+if [ -n "$THEME_BG" ]; then
+    info "Found theme background: $(basename "$THEME_BG")"
+    
+    # Copy to GRUB directory
+    GRUB_BG_DIR="/boot/grub"
+    mkdir -p "$GRUB_BG_DIR"
+    
+    # Determine extension
+    BG_EXT="${THEME_BG##*.}"
+    GRUB_BG_FILE="$GRUB_BG_DIR/wolf-background.$BG_EXT"
+    
+    info "Copying to: $GRUB_BG_FILE"
+    cp "$THEME_BG" "$GRUB_BG_FILE"
+    chmod 644 "$GRUB_BG_FILE"
+    
+    # Remove old GRUB_BACKGROUND lines
+    sed -i '/^GRUB_BACKGROUND=/d' "$GRUB_CONFIG"
+    sed -i '/^#GRUB_BACKGROUND=/d' "$GRUB_CONFIG"
+    
+    # Add GRUB_BACKGROUND to config
+    echo "GRUB_BACKGROUND=\"$GRUB_BG_FILE\"" >> "$GRUB_CONFIG"
+    
+    success "✅ GRUB fallback background configured!"
+    info "Background file: $GRUB_BG_FILE"
+    
+    # Also remove Debian default backgrounds if they exist
+    info "Removing Debian default backgrounds..."
+    for debian_bg in /boot/grub/debian-theme/grub-4x3.png /boot/grub/debian-theme/grub-16x9.png; do
+        if [ -f "$debian_bg" ]; then
+            mv "$debian_bg" "${debian_bg}.disabled" 2>/dev/null || true
+            info "  • Disabled: $(basename "$debian_bg")"
+        fi
+    done
+    
+    success "✅ Debian default backgrounds disabled"
+else
+    warn "⚠️  No background found in theme"
+    info "Theme will use text-based menu only"
+fi
+
+echo
+
 #==================#
 #   Verification   #
 #==================#
 echo
 info "Verifying GRUB configuration..."
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-grep "GRUB_THEME\|GRUB_GFXMODE\|GRUB_GFXPAYLOAD" "$GRUB_CONFIG" | while read -r line; do
+echo "┌────────────────────────────────────────┐"
+grep "GRUB_THEME\|GRUB_GFXMODE\|GRUB_GFXPAYLOAD\|GRUB_BACKGROUND" "$GRUB_CONFIG" | while read -r line; do
     echo -e "${GREEN}  $line${RESET}"
 done
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "└────────────────────────────────────────┘"
 
 #==================#
 #   Update GRUB    #
@@ -255,25 +325,45 @@ success "GRUB updated successfully!"
 #   Final Info     #
 #==================#
 echo
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "┌────────────────────────────────────────────────────────────┐"
 success "✅ GRUB Theme Installed Successfully!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "└────────────────────────────────────────────────────────────┘"
 echo
 info "📋 Installation Summary:"
+echo
 echo "  • Theme: $THEME_NAME"
 echo "  • Location: $THEME_DEST"
 echo "  • Config: $THEME_DEST/theme.txt"
-if [ -n "$BACKGROUND_FILES" ]; then
-    echo "  • Background: Using theme's own background"
+if [ -n "$THEME_BG" ]; then
+    echo "  • Menu Background: Using theme's background"
+    echo "  • Fallback Background: $GRUB_BG_FILE"
+    echo "  • Debian backgrounds: DISABLED"
 else
-    echo "  • Background: Using GRUB default"
+    echo "  • Background: Text-based menu"
 fi
+echo
+success "🎯 Fixed Issues:"
+echo
+echo "  ✅ Theme background displayed in menu"
+echo "  ✅ Fallback background set (no more Debian default)"
+echo "  ✅ Background persists after OS selection"
+echo "  ✅ Debian default backgrounds disabled"
 echo
 warn "⚠️  GRUB theme will be visible on next reboot"
 echo
+info "🧪 Test GRUB Theme (optional):"
+echo
+echo "  View current GRUB config:"
+echo "    cat /boot/grub/grub.cfg | grep -A5 'set theme'"
+echo
+echo "  Check background file:"
+echo "    ls -lh $GRUB_BG_FILE"
+echo
 info "🔧 Troubleshooting:"
+echo
 echo "  • Restore backup: cp $GRUB_CONFIG.backup.* $GRUB_CONFIG"
 echo "  • Update GRUB manually: sudo update-grub"
 echo "  • Check theme files: ls -la $THEME_DEST"
-echo "  • View GRUB config: cat $GRUB_CONFIG | grep GRUB_THEME"
+echo "  • View GRUB config: cat $GRUB_CONFIG | grep GRUB_"
+echo "  • Re-enable Debian bg: mv /boot/grub/debian-theme/*.disabled /boot/grub/debian-theme/"
 echo

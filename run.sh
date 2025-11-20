@@ -82,6 +82,7 @@ SCRIPTS=(
     "installApps.sh|Install applications (Browsers, IDE, Media, etc)|Y"
     "installSecurityTools.sh|Install security & penetration testing tools|N"
     "installFonts.sh|Install system fonts (Arabic + English)|Y"
+    "installIcons.sh|Install icon themes (Papirus/Flat Remix)|Y"
     "installNeofetch.sh|Configure Neofetch with WOLF OS theme|Y"
     "installPlymouth.sh|Install and configure Plymouth boot theme|Y"
     "installGrubTheme.sh|Install and configure GRUB theme|Y"

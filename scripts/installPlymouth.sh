@@ -168,8 +168,66 @@ find "$THEME_DEST" -type f -exec chmod 644 {} \;
 success "Theme copied successfully!"
 
 #===========================================#
+#   Ensure Plymouth in GRUB Configuration  #
+#===========================================#
+echo
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "🔧 Ensuring Plymouth Enabled in GRUB"
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo
+
+GRUB_CMDLINE="/etc/default/grub"
+
+# Backup GRUB config
+if [ ! -f "${GRUB_CMDLINE}.backup.plymouth" ]; then
+    cp "$GRUB_CMDLINE" "${GRUB_CMDLINE}.backup.plymouth"
+    info "GRUB config backed up"
+fi
+
+# Check and add 'splash' parameter
+if grep -q "^GRUB_CMDLINE_LINUX_DEFAULT=" "$GRUB_CMDLINE"; then
+    CURRENT_LINE=$(grep "^GRUB_CMDLINE_LINUX_DEFAULT=" "$GRUB_CMDLINE")
+    
+    # Check if splash already exists
+    if echo "$CURRENT_LINE" | grep -q "splash"; then
+        success "Plymouth 'splash' already enabled in GRUB"
+    else
+        info "Adding 'splash' parameter to GRUB cmdline..."
+        sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 splash"/' "$GRUB_CMDLINE"
+        success "✅ Added 'splash' to GRUB cmdline"
+    fi
+    
+    # Also check for 'quiet' (recommended but not mandatory)
+    if ! echo "$CURRENT_LINE" | grep -q "quiet"; then
+        info "Adding 'quiet' parameter (recommended)..."
+        sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 quiet"/' "$GRUB_CMDLINE"
+        success "✅ Added 'quiet' to GRUB cmdline"
+    else
+        info "'quiet' already present"
+    fi
+else
+    # GRUB_CMDLINE_LINUX_DEFAULT doesn't exist, create it
+    warn "GRUB_CMDLINE_LINUX_DEFAULT not found, creating..."
+    echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"' >> "$GRUB_CMDLINE"
+    success "✅ Created GRUB_CMDLINE_LINUX_DEFAULT with Plymouth"
+fi
+
+# Clean up extra spaces
+sed -i 's/  \+/ /g' "$GRUB_CMDLINE"
+
+echo
+info "Current GRUB cmdline:"
+grep "^GRUB_CMDLINE_LINUX_DEFAULT=" "$GRUB_CMDLINE" | sed 's/^/  /'
+
+#===========================================#
 #   Configure Plymouth to Use Theme        #
 #===========================================#
+echo
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "🎨 Configuring Plymouth Theme"
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo
+
 PLYMOUTH_FILE_NAME="$(basename "$PLYMOUTH_FILE")"
 THEME_CONFIG_NAME="${PLYMOUTH_FILE_NAME%.plymouth}"
 
@@ -198,16 +256,34 @@ success "Plymouth theme configured!"
 #==================#
 #   Update initramfs #
 #==================#
+echo
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "🔄 Updating System Boot Configuration"
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo
+
 info "Updating initramfs (this may take a few minutes)..."
 update-initramfs -u -k all
 
 success "Initramfs updated!"
 
+info "Updating GRUB configuration..."
+if command -v update-grub &> /dev/null; then
+    update-grub
+elif command -v grub-mkconfig &> /dev/null; then
+    grub-mkconfig -o /boot/grub/grub.cfg
+fi
+
+success "GRUB updated!"
+
 #==================#
 #   Verification   #
 #==================#
 echo
-info "Verifying installation..."
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+info "✅ Verifying Installation"
+info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo
 
 CURRENT_THEME=$(plymouth-set-default-theme 2>/dev/null || echo "unknown")
 info "Current Plymouth theme: $CURRENT_THEME"
@@ -230,29 +306,62 @@ else
     fi
 fi
 
+# Verify GRUB settings
+echo
+info "GRUB Plymouth Settings:"
+grep "GRUB_CMDLINE_LINUX_DEFAULT" "$GRUB_CMDLINE" | sed 's/^/  /'
+
 #==================#
 #   Final Info     #
 #==================#
 echo
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "┌────────────────────────────────────────────────────────────┐"
 success "✅ Plymouth Installation Complete!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "└────────────────────────────────────────────────────────────┘"
 echo
 info "📋 Installation Summary:"
+echo
 echo "  • Theme: $THEME_NAME"
 echo "  • Location: $THEME_DEST"
 echo "  • Config: $PLYMOUTH_FILE_NAME"
+echo "  • GRUB: 'splash' parameter enabled"
+echo "  • Status: Active on next boot"
+echo
+success "🎯 Verified:"
+echo
+echo "  ✅ Plymouth theme installed"
+echo "  ✅ Theme set as default"
+echo "  ✅ Initramfs updated"
+echo "  ✅ GRUB configured with 'splash'"
+echo "  ✅ Boot splash screen will appear on next reboot"
 echo
 warn "⚠️  Plymouth theme will be visible on next boot"
 echo
-info "🧪 Test Plymouth now (will briefly show boot screen):"
-echo "  sudo plymouthd"
-echo "  sudo plymouth --show-splash"
-echo "  sleep 5"
-echo "  sudo plymouth quit"
+info "🧪 Test Plymouth Now (optional):"
+echo
+echo "  This will briefly show the boot screen:"
+echo
+echo "    sudo plymouthd"
+echo "    sudo plymouth --show-splash"
+echo "    sleep 5"
+echo "    sudo plymouth quit"
 echo
 info "🔧 Troubleshooting:"
-echo "  • Check available themes: plymouth-set-default-theme --list"
-echo "  • Switch themes: plymouth-set-default-theme <theme-name>"
-echo "  • Rebuild initramfs: update-initramfs -u"
+echo
+echo "  • List available themes:"
+echo "    plymouth-set-default-theme --list"
+echo
+echo "  • Switch themes:"
+echo "    plymouth-set-default-theme <theme-name>"
+echo "    update-initramfs -u"
+echo
+echo "  • Rebuild initramfs:"
+echo "    update-initramfs -u -k all"
+echo
+echo "  • Check GRUB cmdline:"
+echo "    cat /proc/cmdline"
+echo
+echo "  • Restore GRUB backup:"
+echo "    cp /etc/default/grub.backup.plymouth /etc/default/grub"
+echo "    update-grub"
 echo

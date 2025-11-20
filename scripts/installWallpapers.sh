@@ -18,7 +18,7 @@ info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
-section() { echo -e "${CYAN}${BOLD}━━━ $1 ━━━${RESET}"; }
+section() { echo -e "${CYAN}${BOLD}┌── $1 ──┐${RESET}"; }
 
 #==================#
 #   Check Root     #
@@ -77,7 +77,30 @@ info "Copying wallpapers to $SYSTEM_WALLPAPERS..."
 cp -r "$WALLPAPERS_SOURCE"/* "$SYSTEM_WALLPAPERS/"
 chmod 644 "$SYSTEM_WALLPAPERS"/*
 
-success "Wallpapers copied!"
+success "Wallpapers copied to backgrounds!"
+
+#===========================================#
+#   Copy to /usr/share/images (Debian)     #
+#===========================================#
+section "Installing to /usr/share/images (Debian default)"
+
+IMAGES_DIR="/usr/share/images"
+mkdir -p "$IMAGES_DIR"
+
+# Create symlink for easy access
+if [ -L "$IMAGES_DIR/wolf-os" ]; then
+    rm "$IMAGES_DIR/wolf-os"
+fi
+ln -sf "$SYSTEM_WALLPAPERS" "$IMAGES_DIR/wolf-os"
+success "Symlink created: $IMAGES_DIR/wolf-os"
+
+# Also copy directly for maximum compatibility
+info "Copying wallpapers to $IMAGES_DIR/wolf-os-wallpapers..."
+IMAGES_WALLPAPERS="$IMAGES_DIR/wolf-os-wallpapers"
+mkdir -p "$IMAGES_WALLPAPERS"
+cp -r "$SYSTEM_WALLPAPERS"/* "$IMAGES_WALLPAPERS/"
+chmod 644 "$IMAGES_WALLPAPERS"/*
+success "Wallpapers also available in $IMAGES_WALLPAPERS"
 
 #===========================================#
 #   Create GNOME XML Wallpaper Metadata    #
@@ -217,7 +240,7 @@ if command -v gsettings &> /dev/null && [ -d "/usr/share/gnome" ]; then
         success "  ✓ GNOME desktop wallpaper configured!"
         set_wallpaper_success=true
     else
-        warn "  ⚠ Could not set GNOME wallpaper (user may need to be logged in)"
+        warn "  ⚠  Could not set GNOME wallpaper (user may need to be logged in)"
     fi
     echo
 fi
@@ -235,7 +258,7 @@ if command -v xfconf-query &> /dev/null && [ -d "/usr/share/xfce4" ]; then
             fi
         done
     else
-        warn "  ⚠ Could not detect XFCE monitors (user may need to be logged in)"
+        warn "  ⚠  Could not detect XFCE monitors (user may need to be logged in)"
     fi
     echo
 fi
@@ -250,7 +273,7 @@ if command -v kwriteconfig5 &> /dev/null && [ -d "/usr/share/plasma" ]; then
         success "  ✓ KDE desktop wallpaper configured!"
         set_wallpaper_success=true
     else
-        warn "  ⚠ Could not set KDE wallpaper (user may need to be logged in)"
+        warn "  ⚠  Could not set KDE wallpaper (user may need to be logged in)"
     fi
     echo
 fi
@@ -263,7 +286,7 @@ if command -v gsettings &> /dev/null && [ -d "/usr/share/mate" ]; then
         success "  ✓ MATE desktop wallpaper configured!"
         set_wallpaper_success=true
     else
-        warn "  ⚠ Could not set MATE wallpaper"
+        warn "  ⚠  Could not set MATE wallpaper"
     fi
     echo
 fi
@@ -276,7 +299,7 @@ if command -v gsettings &> /dev/null && [ -d "/usr/share/cinnamon" ]; then
         success "  ✓ Cinnamon desktop wallpaper configured!"
         set_wallpaper_success=true
     else
-        warn "  ⚠ Could not set Cinnamon wallpaper"
+        warn "  ⚠  Could not set Cinnamon wallpaper"
     fi
     echo
 fi
@@ -291,7 +314,7 @@ if [ -d "/usr/share/lxqt" ] || [ -d "/usr/share/lxde" ]; then
         success "  ✓ LXQt/LXDE wallpaper configured!"
         set_wallpaper_success=true
     else
-        warn "  ⚠ Could not find PCManFM config"
+        warn "  ⚠  Could not find PCManFM config"
     fi
     echo
 fi
@@ -354,7 +377,7 @@ fi
 # GDM (GNOME Display Manager) - INFO ONLY, NOT SETTING
 if command -v gdm3 &> /dev/null || command -v gdm &> /dev/null; then
     info "Detected: GDM (GNOME Display Manager)"
-    warn "  ⚠ GDM configuration skipped (uses theme background, not wallpaper)"
+    warn "  ⚠  GDM configuration skipped (uses theme background, not wallpaper)"
     info "  ℹ️  To customize GDM, modify the GNOME Shell theme instead"
     echo
 fi
@@ -362,7 +385,7 @@ fi
 # SDDM (KDE/Qt Display Manager) - INFO ONLY
 if command -v sddm &> /dev/null; then
     info "Detected: SDDM (Simple Desktop Display Manager)"
-    warn "  ⚠ SDDM configuration skipped (uses theme background)"
+    warn "  ⚠  SDDM configuration skipped (uses theme background)"
     info "  ℹ️  To customize SDDM, edit /etc/sddm.conf or use System Settings"
     echo
 fi
@@ -376,14 +399,16 @@ fi
 #   Summary                                #
 #===========================================#
 echo
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "┌────────────────────────────────────────────────────────────┐"
 success "✅ WOLF OS Wallpapers Configured as System Collection!"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "└────────────────────────────────────────────────────────────┘"
 echo
 info "📋 Installation Summary:"
 echo
-echo "  📁 System Location:"
-echo "     $SYSTEM_WALLPAPERS"
+echo "  📁 System Locations:"
+echo "     • $SYSTEM_WALLPAPERS"
+echo "     • $IMAGES_WALLPAPERS"
+echo "     • $IMAGES_DIR/wolf-os (symlink)"
 echo
 echo "  🎨 Desktop Environment Integration:"
 if [ -f "$GNOME_PROPERTIES_DIR/wolf-os-wallpapers.xml" ]; then
@@ -395,6 +420,7 @@ fi
 if [ -d "$KDE_WALLPAPER_DIR" ]; then
     echo "     ✅ KDE: Added to wallpaper collection"
 fi
+echo "     ✅ Debian: Available in /usr/share/images"
 echo
 echo "  🖼️  Desktop Wallpaper:"
 echo "     $DESKTOP_WALLPAPER"
@@ -412,7 +438,7 @@ else
     echo "     Status: ℹ️  Not applicable (GDM/SDDM use themes)"
 fi
 echo
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "┌────────────────────────────────────────────────────────────┐"
 echo
 info "🎨 How to Use WOLF OS Wallpapers:"
 echo
@@ -431,10 +457,12 @@ echo
 echo "  ${CYAN}Other DEs:${RESET}"
 echo "    Settings → Appearance → Browse to:"
 echo "    $SYSTEM_WALLPAPERS"
+echo "    Or: $IMAGES_WALLPAPERS"
 echo
 warn "⚠️  Important Notes:"
 echo
 echo "  • WOLF OS wallpapers are now part of system collection"
+echo "  • Available in BOTH /usr/share/backgrounds AND /usr/share/images"
 echo "  • They will appear in wallpaper pickers of all desktop environments"
 echo "  • Desktop wallpaper changes require user to be logged in"
 echo "  • LightDM greeter will show wolf-greeter.jpg on next login"
