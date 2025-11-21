@@ -18,7 +18,7 @@ info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
-section() { echo -e "${CYAN}${BOLD}┌── $1 ──┐${RESET}"; }
+section() { echo -e "${CYAN}┌── $1 ──┐${RESET}"; }
 
 #==================#
 #   Check Root     #
