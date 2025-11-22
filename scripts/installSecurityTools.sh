@@ -11,13 +11,35 @@ YELLOW="\033[1;33m"
 BLUE="\033[1;34m"
 CYAN="\033[1;36m"
 MAGENTA="\033[1;35m"
+BOLD="\033[1m"
 RESET="\033[0m"
 
 info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
-section() { echo -e "${CYAN}$1${RESET}"; }
+section() { echo -e "${CYAN}┌── $1 ──┐${RESET}"; }
+
+# Ask user function with clear prompt
+ask_user() {
+    local prompt="$1"
+    local options="$2"
+    local response
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${YELLOW}${BOLD}❓ ${prompt}${RESET}"
+    if [ -n "$options" ]; then
+        echo ""
+        echo -e "$options"
+    fi
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+    read -rp "👉 Your choice: " response
+    echo ""
+    
+    echo "$response"
+}
 
 #==================#
 #   Require Root   #
@@ -33,30 +55,38 @@ fi
 REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo ~$REAL_USER)
 
-echo "=============================================="
-echo "   🔐 Security & Penetration Testing Tools"
-echo "=============================================="
-echo
-warn "⚠️  These tools are for authorized security testing only!"
-warn "⚠️  Misuse of these tools may be illegal!"
-echo
-read -p "Do you understand and agree? (yes/no): " agreement
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║     🛡️  Security & Penetration Testing Tools 🛡️      ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
+echo -e "${RED}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+echo -e "${RED}${BOLD}║                   ⚠️  WARNING ⚠️                      ║${RESET}"
+echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+echo -e "${RED}${BOLD}║  These tools are for AUTHORIZED testing ONLY!        ║${RESET}"
+echo -e "${RED}${BOLD}║  Misuse may be ILLEGAL and result in prosecution!    ║${RESET}"
+echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+echo -e "${RED}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+agreement=$(ask_user "Do you understand and agree to use these tools legally?" "${GREEN}Type 'yes' to continue${RESET}")
+
 if [[ ! $agreement =~ ^[Yy][Ee][Ss]$ ]]; then
     error "Installation cancelled."
     exit 1
 fi
 
-echo
+echo ""
 info "Updating package lists..."
-apt update
+apt update -qq
 
 #===========================================#
 #   Essential Network Tools                #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🌐 Essential Network Tools
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🌐 Essential Network Tools"
 
 info "Installing essential network tools..."
 apt install -y \
@@ -65,17 +95,15 @@ apt install -y \
     net-tools \
     dnsutils \
     iputils-ping \
-    traceroute
+    traceroute \
+    unzip
 
 success "Essential network tools installed"
 
 #===========================================#
 #   PostgreSQL Database                    #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🗄️  PostgreSQL Database
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🗄️  PostgreSQL Database"
 
 info "Installing PostgreSQL..."
 apt install -y postgresql postgresql-contrib
@@ -89,12 +117,9 @@ success "PostgreSQL service is running"
 #===========================================#
 #   Tor Network                            #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🧅 Tor Network Configuration
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🧅 Tor Network Configuration"
 
-info "Tor service should already be installed from installApps.sh"
+info "Checking Tor installation..."
 if ! command -v tor &> /dev/null; then
     warn "Tor not found, installing..."
     apt install -y tor
@@ -103,31 +128,27 @@ if ! command -v tor &> /dev/null; then
     success "Tor installed and started"
 else
     success "Tor is already installed"
+    systemctl is-active --quiet tor || systemctl start tor
 fi
 
 #===========================================#
 #   IPTables & Firewall Configuration      #
 #===========================================#
-section "
-┌──────────────────────────────────────────┐
-  🔥 IPTables Firewall Configuration
-└──────────────────────────────────────────┘"
+section "🔥 IPTables Firewall Configuration"
 
 info "Installing iptables and iptables-persistent..."
 apt install -y iptables iptables-persistent
 success "IPTables installed"
 
-echo
-info "Choose IPTables security level:"
-echo
-echo "1) ${GREEN}Basic${RESET}      - Permissive (allows most traffic, blocks common threats)"
-echo "2) ${YELLOW}Medium${RESET}     - Balanced (recommended for daily use)"
-echo "3) ${RED}Tails-like${RESET} - Strict (maximum privacy, force Tor routing)"
-echo "4) ${CYAN}Custom${RESET}     - Configure manually"
-echo "5) ${BLUE}Skip${RESET}       - Don't configure firewall"
-echo
+OPTIONS="
+${GREEN}${BOLD}1)${RESET} ${GREEN}Basic${RESET}      - Permissive (allows most traffic)
+${YELLOW}${BOLD}2)${RESET} ${YELLOW}Medium${RESET}     - Balanced (⭐ RECOMMENDED for daily use)
+${RED}${BOLD}3)${RESET} ${RED}Tails-like${RESET} - Strict (⚠️  Forces ALL traffic through Tor)
+${CYAN}${BOLD}4)${RESET} ${CYAN}Custom${RESET}     - Configure manually
+${BLUE}${BOLD}5)${RESET} ${BLUE}Skip${RESET}       - Don't configure firewall
+"
 
-read -rp "Select security level [1-5]: " iptables_level
+iptables_level=$(ask_user "Choose IPTables security level [1-5]" "$OPTIONS")
 
 case $iptables_level in
     5)
@@ -137,8 +158,9 @@ case $iptables_level in
         info "Configuring IPTables rules..."
         
         # Backup existing rules
-        iptables-save > /etc/iptables/rules.v4.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
-        ip6tables-save > /etc/iptables/rules.v6.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
+        mkdir -p /etc/iptables/backups
+        iptables-save > "/etc/iptables/backups/rules.v4.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+        ip6tables-save > "/etc/iptables/backups/rules.v6.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
         
         # Flush existing rules
         iptables -F
@@ -155,15 +177,10 @@ case $iptables_level in
         ip6tables -t mangle -F
         ip6tables -t mangle -X
         
-        # ════════════════════════════════════════
-        # Apply rules based on security level
-        # ════════════════════════════════════════
-        
         case $iptables_level in
             1) # BASIC - Permissive
                 info "Applying BASIC security rules..."
                 
-                # Default policies - ACCEPT
                 iptables -P INPUT ACCEPT
                 iptables -P FORWARD DROP
                 iptables -P OUTPUT ACCEPT
@@ -187,12 +204,10 @@ case $iptables_level in
             2) # MEDIUM - Balanced (RECOMMENDED)
                 info "Applying MEDIUM security rules (Recommended)..."
                 
-                # Default policies
                 iptables -P INPUT DROP
                 iptables -P FORWARD DROP
                 iptables -P OUTPUT ACCEPT
                 
-                # IPv6 - more restrictive
                 ip6tables -P INPUT DROP
                 ip6tables -P FORWARD DROP
                 ip6tables -P OUTPUT ACCEPT
@@ -206,10 +221,7 @@ case $iptables_level in
                 
                 # Allow established connections
                 iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                
                 ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                ip6tables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
                 
                 # Allow DNS
                 iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
@@ -237,57 +249,97 @@ case $iptables_level in
                 ;;
                 
             3) # TAILS-LIKE - Strict
-                info "Applying TAILS-LIKE security rules (Strict)..."
+                echo ""
+                echo -e "${RED}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+                echo -e "${RED}${BOLD}║               ⚠️  CRITICAL WARNING ⚠️                 ║${RESET}"
+                echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+                echo -e "${RED}${BOLD}║  TAILS-LIKE mode will:                                ║${RESET}"
+                echo -e "${RED}${BOLD}║  • Block ALL normal internet traffic                  ║${RESET}"
+                echo -e "${RED}${BOLD}║  • Force everything through Tor (slower)              ║${RESET}"
+                echo -e "${RED}${BOLD}║  • Break most regular applications                    ║${RESET}"
+                echo -e "${RED}${BOLD}║  • Block ALL IPv6 traffic                             ║${RESET}"
+                echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+                echo -e "${RED}${BOLD}║  Only choose this if you know what you're doing!      ║${RESET}"
+                echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+                echo -e "${RED}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+                echo ""
                 
-                # Default policies - DROP everything
-                iptables -P INPUT DROP
-                iptables -P FORWARD DROP
-                iptables -P OUTPUT DROP
+                confirm=$(ask_user "Are you ABSOLUTELY sure you want TAILS-LIKE mode?" "${RED}Type 'YES' in capital letters${RESET}")
                 
-                # Block ALL IPv6 (force IPv4 through Tor)
-                ip6tables -P INPUT DROP
-                ip6tables -P FORWARD DROP
-                ip6tables -P OUTPUT DROP
-                
-                # Allow loopback
-                iptables -A INPUT -i lo -j ACCEPT
-                iptables -A OUTPUT -o lo -j ACCEPT
-                
-                # Allow established connections
-                iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
-                
-                # Allow DNS through Tor
-                iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
-                iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
-                
-                # Allow Tor connections
-                # Tor SOCKS port (9050)
-                iptables -A OUTPUT -p tcp --dport 9050 -j ACCEPT
-                
-                # Tor Control port (9051) - localhost only
-                iptables -A OUTPUT -d 127.0.0.1 -p tcp --dport 9051 -j ACCEPT
-                
-                # Tor Directory servers (80, 443)
-                iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
-                iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
-                
-                # Tor relay ports (9001, 9030)
-                iptables -A OUTPUT -p tcp --dport 9001 -j ACCEPT
-                iptables -A OUTPUT -p tcp --dport 9030 -j ACCEPT
-                
-                # OPTIONAL: Allow ICMP (comment out for maximum privacy)
-                # iptables -A OUTPUT -p icmp -j ACCEPT
-                # iptables -A INPUT -p icmp -j ACCEPT
-                
-                # Log dropped packets (for debugging)
-                iptables -A INPUT -j LOG --log-prefix "IPT-INPUT-DROP: " --log-level 4
-                iptables -A OUTPUT -j LOG --log-prefix "IPT-OUTPUT-DROP: " --log-level 4
-                
-                warn "⚠️  STRICT MODE ENABLED!"
-                warn "⚠️  All traffic MUST go through Tor"
-                warn "⚠️  Regular internet apps may not work"
-                success "TAILS-LIKE rules applied"
+                if [[ "$confirm" != "YES" ]]; then
+                    warn "TAILS-LIKE mode cancelled. Falling back to MEDIUM security."
+                    iptables_level=2
+                    
+                    # Apply medium rules instead
+                    iptables -P INPUT DROP
+                    iptables -P FORWARD DROP
+                    iptables -P OUTPUT ACCEPT
+                    
+                    ip6tables -P INPUT DROP
+                    ip6tables -P FORWARD DROP
+                    ip6tables -P OUTPUT ACCEPT
+                    
+                    iptables -A INPUT -i lo -j ACCEPT
+                    iptables -A OUTPUT -o lo -j ACCEPT
+                    ip6tables -A INPUT -i lo -j ACCEPT
+                    ip6tables -A OUTPUT -o lo -j ACCEPT
+                    
+                    iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                    ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                    
+                    iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 22 -j ACCEPT
+                    iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
+                    iptables -A OUTPUT -p icmp -j ACCEPT
+                    iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
+                    iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+                    iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+                    
+                    success "MEDIUM rules applied instead"
+                else
+                    info "Applying TAILS-LIKE security rules (Strict)..."
+                    
+                    iptables -P INPUT DROP
+                    iptables -P FORWARD DROP
+                    iptables -P OUTPUT DROP
+                    
+                    # Block ALL IPv6
+                    ip6tables -P INPUT DROP
+                    ip6tables -P FORWARD DROP
+                    ip6tables -P OUTPUT DROP
+                    
+                    # Allow loopback
+                    iptables -A INPUT -i lo -j ACCEPT
+                    iptables -A OUTPUT -o lo -j ACCEPT
+                    
+                    # Allow established connections
+                    iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                    iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+                    
+                    # Allow DNS
+                    iptables -A OUTPUT -p udp --dport 53 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT
+                    
+                    # Allow Tor connections
+                    iptables -A OUTPUT -p tcp --dport 9050 -j ACCEPT
+                    iptables -A OUTPUT -d 127.0.0.1 -p tcp --dport 9051 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 9001 -j ACCEPT
+                    iptables -A OUTPUT -p tcp --dport 9030 -j ACCEPT
+                    
+                    # Log dropped packets
+                    iptables -A INPUT -j LOG --log-prefix "IPT-INPUT-DROP: " --log-level 4
+                    iptables -A OUTPUT -j LOG --log-prefix "IPT-OUTPUT-DROP: " --log-level 4
+                    
+                    warn "⚠️  STRICT MODE ENABLED!"
+                    warn "⚠️  All traffic MUST go through Tor"
+                    success "TAILS-LIKE rules applied"
+                fi
                 ;;
                 
             4) # CUSTOM
@@ -302,54 +354,10 @@ case $iptables_level in
             iptables-save > /etc/iptables/rules.v4
             ip6tables-save > /etc/iptables/rules.v6
             
-            # Make rules persistent
             systemctl enable netfilter-persistent
             systemctl start netfilter-persistent
             
             success "IPTables rules saved and will persist after reboot"
-            
-            # Display summary
-            echo
-            info "📊 IPTables Configuration Summary:"
-            echo
-            case $iptables_level in
-                1)
-                    echo "  🟢 Security Level: BASIC (Permissive)"
-                    echo "  ✓ Default policy: ACCEPT (input/output)"
-                    echo "  ✓ Blocks: Invalid packets, port scans"
-                    echo "  ✓ Rate limits: SSH connections"
-                    echo "  ✓ Allows: All normal traffic"
-                    ;;
-                2)
-                    echo "  🟡 Security Level: MEDIUM (Balanced) ⭐ RECOMMENDED"
-                    echo "  ✓ Default INPUT: DROP"
-                    echo "  ✓ Default OUTPUT: ACCEPT"
-                    echo "  ✓ Allows: HTTP, HTTPS, DNS, SSH, established connections"
-                    echo "  ✓ Blocks: Unsolicited inbound, invalid packets"
-                    echo "  ✓ IPv6: More restrictive"
-                    ;;
-                3)
-                    echo "  🔴 Security Level: TAILS-LIKE (Strict)"
-                    echo "  ✓ Default policy: DROP ALL"
-                    echo "  ✓ IPv6: COMPLETELY BLOCKED"
-                    echo "  ✓ Allows ONLY: Tor connections (9050, 9051, 80, 443, 9001, 9030)"
-                    echo "  ✓ DNS: Allowed"
-                    echo "  ✓ Logging: Enabled for dropped packets"
-                    echo "  ⚠️  WARNING: Only Tor traffic allowed!"
-                    ;;
-            esac
-            echo
-            
-            # Show commands to manage rules
-            info "🛠️  Manage IPTables:"
-            echo
-            echo "  View rules:      ${CYAN}sudo iptables -L -v -n${RESET}"
-            echo "  View IPv6 rules: ${CYAN}sudo ip6tables -L -v -n${RESET}"
-            echo "  Restore backup:  ${CYAN}sudo iptables-restore < /etc/iptables/rules.v4.backup.*${RESET}"
-            echo "  Edit rules:      ${CYAN}sudo nano /etc/iptables/rules.v4${RESET}"
-            echo "  Reload rules:    ${CYAN}sudo systemctl restart netfilter-persistent${RESET}"
-            echo "  Disable firewall: ${CYAN}sudo systemctl stop netfilter-persistent${RESET}"
-            echo
         fi
         ;;
 esac
@@ -357,10 +365,7 @@ esac
 #===========================================#
 #   Network Scanning & Reconnaissance      #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🔍 Network Scanning & Reconnaissance
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🔍 Network Scanning & Reconnaissance"
 
 info "Installing Nmap..."
 apt install -y nmap
@@ -368,15 +373,15 @@ success "Nmap installed"
 
 info "Installing Netcat..."
 apt install -y netcat-traditional
-update-alternatives --set nc /bin/nc.traditional
-success "Netcat-traditional installed and set as default"
+update-alternatives --set nc /bin/nc.traditional 2>/dev/null || true
+success "Netcat-traditional installed"
 
 info "Installing Subfinder (subdomain discovery)..."
 if command -v subfinder &> /dev/null; then
     warn "Subfinder already installed"
 else
-    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest'
-    ln -sf "$USER_HOME/go/bin/subfinder" /usr/local/bin/subfinder
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin && go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest'
+    ln -sf "$USER_HOME/go/bin/subfinder" /usr/local/bin/subfinder 2>/dev/null || true
     success "Subfinder installed"
 fi
 
@@ -384,18 +389,15 @@ info "Installing Httpx (HTTP toolkit)..."
 if command -v httpx &> /dev/null; then
     warn "Httpx already installed"
 else
-    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest'
-    ln -sf "$USER_HOME/go/bin/httpx" /usr/local/bin/httpx
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin && go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest'
+    ln -sf "$USER_HOME/go/bin/httpx" /usr/local/bin/httpx 2>/dev/null || true
     success "Httpx installed"
 fi
 
 #===========================================#
 #   Web Application Testing                #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🌐 Web Application Testing
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🌐 Web Application Testing"
 
 info "Installing SQLMap..."
 apt install -y sqlmap
@@ -413,8 +415,8 @@ info "Installing Ffuf (fast web fuzzer)..."
 if command -v ffuf &> /dev/null; then
     warn "Ffuf already installed"
 else
-    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install github.com/ffuf/ffuf/v2@latest'
-    ln -sf "$USER_HOME/go/bin/ffuf" /usr/local/bin/ffuf
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin && go install github.com/ffuf/ffuf/v2@latest'
+    ln -sf "$USER_HOME/go/bin/ffuf" /usr/local/bin/ffuf 2>/dev/null || true
     success "Ffuf installed"
 fi
 
@@ -426,8 +428,8 @@ info "Installing Nuclei (vulnerability scanner)..."
 if command -v nuclei &> /dev/null; then
     warn "Nuclei already installed"
 else
-    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest'
-    ln -sf "$USER_HOME/go/bin/nuclei" /usr/local/bin/nuclei
+    sudo -u $REAL_USER bash -c 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin && go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest'
+    ln -sf "$USER_HOME/go/bin/nuclei" /usr/local/bin/nuclei 2>/dev/null || true
     sudo -u $REAL_USER nuclei -update-templates
     success "Nuclei installed and templates updated"
 fi
@@ -435,10 +437,7 @@ fi
 #===========================================#
 #   Wireless Security                      #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  📶 Wireless Security
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "📶 Wireless Security"
 
 info "Installing Aircrack-ng suite..."
 apt install -y aircrack-ng
@@ -456,16 +455,12 @@ else
     chmod +x /opt/airgeddon/airgeddon.sh
     ln -sf /opt/airgeddon/airgeddon.sh /usr/local/bin/airgeddon
     success "Airgeddon installed to /opt/airgeddon"
-    info "Run with: airgeddon"
 fi
 
 #===========================================#
 #   Password Attacks                       #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🔓 Password Cracking
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🔓 Password Cracking"
 
 info "Installing Hydra..."
 apt install -y hydra
@@ -482,10 +477,7 @@ success "CrackMapExec installed"
 #===========================================#
 #   Privilege Escalation                   #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ⬆️  Privilege Escalation
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "⬆️  Privilege Escalation"
 
 info "Installing PEASS-ng (LinPEAS/WinPEAS)..."
 
@@ -504,16 +496,11 @@ ln -sf "$PEASS_DIR/linPEAS/linpeas.sh" /usr/local/bin/linpeas
 chmod +x "$PEASS_DIR/linPEAS/linpeas.sh"
 
 success "PEASS-ng installed to $PEASS_DIR"
-info "LinPEAS: linpeas or $PEASS_DIR/linPEAS/linpeas.sh"
-info "WinPEAS: $PEASS_DIR/winPEAS/winPEASany.exe"
 
 #===========================================#
 #   Exploitation Frameworks                #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  💣 Exploitation Frameworks
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "💣 Exploitation Frameworks"
 
 info "Installing Metasploit Framework..."
 if command -v msfconsole &> /dev/null; then
@@ -526,7 +513,6 @@ else
     msfdb init
     
     success "Metasploit Framework installed"
-    info "Run with: msfconsole"
 fi
 
 info "Installing ExploitDB & SearchSploit..."
@@ -536,10 +522,7 @@ success "ExploitDB & SearchSploit installed"
 #===========================================#
 #   Network Attack Tools                   #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🌍 Network Attack Tools
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🌐 Network Attack Tools"
 
 info "Installing Bettercap..."
 apt install -y bettercap
@@ -560,18 +543,14 @@ success "Responder installed"
 #===========================================#
 #   Security Utilities                     #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  🛠️  Security Utilities
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "🛠️  Security Utilities"
 
 info "Installing Macchanger..."
 apt install -y macchanger
 success "Macchanger installed"
 
-info "Installing Pypykatz (Mimikatz Python alternative)..."
-apt install -y python3-pip
-pip3 install pypykatz --break-system-packages
+info "Installing Pypykatz..."
+pip3 install pypykatz --break-system-packages 2>/dev/null || pip3 install pypykatz
 success "Pypykatz installed"
 
 info "Downloading Mimikatz (Windows binary)..."
@@ -582,25 +561,21 @@ if [ -f "$MIMIKATZ_DIR/mimikatz.exe" ]; then
     warn "Mimikatz already downloaded"
 else
     info "Fetching latest Mimikatz release..."
-    MIMIKATZ_URL=$(curl -s https://api.github.com/repos/gentilkiwi/mimikatz/releases/latest | \
-        grep "browser_download_url.*mimikatz_trunk.zip" | cut -d '"' -f 4)
+    MIMIKATZ_URL=$(curl -s https://api.github.com/repos/gentilkiwi/mimikatz/releases/latest | grep "browser_download_url.*mimikatz_trunk.zip" | cut -d '"' -f 4)
     
     if [ -n "$MIMIKATZ_URL" ]; then
-        wget -O /tmp/mimikatz.zip "$MIMIKATZ_URL" --progress=bar:force
-        unzip -o /tmp/mimikatz.zip -d "$MIMIKATZ_DIR"
+        wget -q -O /tmp/mimikatz.zip "$MIMIKATZ_URL"
+        unzip -q -o /tmp/mimikatz.zip -d "$MIMIKATZ_DIR"
         rm -f /tmp/mimikatz.zip
         success "Mimikatz downloaded to $MIMIKATZ_DIR"
-        info "Usage: wine $MIMIKATZ_DIR/x64/mimikatz.exe"
     else
-        warn "Could not fetch Mimikatz URL automatically"
-        info "Download manually from: https://github.com/gentilkiwi/mimikatz/releases"
+        warn "Could not fetch Mimikatz, download manually from GitHub"
     fi
 fi
 
-# Install wine for running Mimikatz
 info "Installing Wine (to run Mimikatz)..."
 dpkg --add-architecture i386
-apt update
+apt update -qq
 apt install -y wine wine32 wine64
 success "Wine installed"
 
@@ -619,10 +594,7 @@ success "SMB tools installed"
 #===========================================#
 #   Wordlists & Dictionaries               #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  📚 Wordlists & Dictionaries
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "📚 Wordlists & Dictionaries"
 
 info "Installing SecLists..."
 apt install -y seclists
@@ -644,19 +616,15 @@ else
         success "RockYou wordlist extracted"
     else
         info "Downloading RockYou wordlist..."
-        wget -O "$ROCKYOU_DIR/rockyou.txt.gz" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
-        gunzip "$ROCKYOU_DIR/rockyou.txt.gz"
-        success "RockYou wordlist downloaded and extracted"
+        wget -q -O "$ROCKYOU_DIR/rockyou.txt" https://github.com/brannondorsey/naive-hashcat/releases/download/data/rockyou.txt
+        success "RockYou wordlist downloaded"
     fi
 fi
 
 #===========================================#
 #   Post-Install Configuration             #
 #===========================================#
-section "
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ⚙️  Post-Installation Configuration
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+section "⚙️  Post-Installation Configuration"
 
 TOOLS_DIR="/opt/security-tools"
 mkdir -p "$TOOLS_DIR"
@@ -681,7 +649,7 @@ alias http-probe='httpx -l'
 alias wifi-mon='airmon-ng start wlan0'
 alias wifi-stop='airmon-ng stop wlan0mon'
 alias hydra-ssh='hydra -L users.txt -P pass.txt ssh://'
-alias crack-hash='john --wordlist=rockyou.txt'
+alias crack-hash='john --wordlist=/usr/share/wordlists/rockyou.txt'
 alias priv-esc='linpeas'
 ALIASEOF
 
@@ -699,98 +667,86 @@ success "Security aliases created: $ALIASES_FILE"
 #===========================================#
 #   Summary                                #
 #===========================================#
-echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-success "✅ Security Tools Installation Complete!"
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║      ✅ Security Tools Installation Complete! ✅      ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
 info "📋 Installed Tools Summary:"
-echo
-echo "🌐 Essential Network Tools:"
-echo "  ✓ wget, curl, net-tools, dnsutils"
-echo
-echo "🗄️  Database:"
-echo "  ✓ PostgreSQL (running)"
-echo
-echo "🔥 Firewall & Privacy:"
-echo "  ✓ IPTables (Tails-like configuration)"
-echo "  ✓ Tor Network (integrated)"
-echo
-echo "🔍 Reconnaissance & Scanning:"
-echo "  ✓ Nmap, Netcat, Subfinder, Httpx"
-echo
-echo "🌐 Web Application Testing:"
-echo "  ✓ SQLMap, WPScan, Nikto, Ffuf, Gobuster, Nuclei"
-echo
-echo "📶 Wireless Security:"
-echo "  ✓ Aircrack-ng, Reaver, Airgeddon"
-echo
-echo "🔓 Password & Authentication:"
-echo "  ✓ Hydra, John the Ripper, CrackMapExec"
-echo
-echo "⬆️  Privilege Escalation:"
-echo "  ✓ PEASS-ng (LinPEAS/WinPEAS)"
-echo
-echo "💣 Exploitation:"
-echo "  ✓ Metasploit Framework, ExploitDB"
-echo
-echo "🌍 Network Attacks:"
-echo "  ✓ Bettercap, Ettercap, MITMproxy, Responder"
-echo
-echo "🛠️  Utilities:"
-echo "  ✓ Macchanger, Pypykatz, Mimikatz, Impacket, Enum4linux, SMB tools, Wine"
-echo
-echo "📚 Wordlists:"
-echo "  ✓ SecLists, Wordlists, RockYou"
-echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo
-info "🔥 IPTables Configuration:"
-echo "  ✓ Default policy: DROP all traffic"
-echo "  ✓ Tor connections: ALLOWED"
-echo "  ✓ IPv6: BLOCKED (forces IPv4 through Tor)"
-echo "  ✓ Established connections: ALLOWED"
-echo "  ✓ Similar to Tails OS firewall setup"
-echo
-info "🎯 Quick Test Commands:"
-echo
-echo "  Check Tor IP:        curl --socks5 127.0.0.1:9050 https://check.torproject.org/api/ip"
-echo "  Port scan:           nmap -sV -sC <target>"
-echo "  Vulnerability scan:  nuclei -u <url>"
-echo "  Directory fuzzing:   ffuf -w wordlist.txt -u URL/FUZZ"
-echo "  Subdomain discovery: subfinder -d example.com"
-echo "  HTTP probing:        httpx -l subdomains.txt"
-echo "  Metasploit:          msfconsole"
-echo "  WiFi monitor mode:   airmon-ng start wlan0"
-echo "  Password cracking:   john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt"
-echo "  Mimikatz:            wine /opt/mimikatz/x64/mimikatz.exe"
-echo
+echo ""
+echo "🌐 Essential: wget, curl, net-tools, dnsutils"
+echo "🗄️  Database: PostgreSQL"
+echo "🔥 Firewall: IPTables configured"
+echo "🧅 Privacy: Tor Network"
+echo "🔍 Recon: Nmap, Netcat, Subfinder, Httpx"
+echo "🌐 Web: SQLMap, WPScan, Nikto, Ffuf, Gobuster, Nuclei"
+echo "📶 Wireless: Aircrack-ng, Reaver, Airgeddon"
+echo "🔓 Password: Hydra, John, CrackMapExec"
+echo "⬆️  PrivEsc: PEASS-ng (LinPEAS/WinPEAS)"
+echo "💣 Exploit: Metasploit, ExploitDB"
+echo "🌐 Network: Bettercap, Ettercap, MITMproxy, Responder"
+echo "🛠️  Utils: Macchanger, Pypykatz, Mimikatz, Impacket, SMB tools"
+echo "📚 Wordlists: SecLists, RockYou"
+echo ""
+info "🎯 Quick Commands:"
+echo "  • Port scan:     nmap -sV -sC <target>"
+echo "  • Vuln scan:     nuclei -u <url>"
+echo "  • Subdomain:     subfinder -d example.com"
+echo "  • Directory:     ffuf -w wordlist.txt -u URL/FUZZ"
+echo "  • Metasploit:    msfconsole"
+echo "  • WiFi monitor:  airmon-ng start wlan0"
+echo "  • Crack hash:    john --wordlist=rockyou.txt hash.txt"
+echo ""
 info "📂 Important Paths:"
-echo "  • Security tools:     /opt/security-tools"
-echo "  • PEASS-ng:           /opt/PEASS-ng"
-echo "  • Mimikatz:           /opt/mimikatz"
-echo "  • Airgeddon:          /opt/airgeddon"
-echo "  • SecLists:           /usr/share/seclists"
-echo "  • Wordlists:          /usr/share/wordlists"
-echo "  • RockYou:            /usr/share/wordlists/rockyou.txt"
-echo "  • Security aliases:   ~/.security_aliases"
-echo
+echo "  • Tools:         /opt/security-tools"
+echo "  • PEASS-ng:      /opt/PEASS-ng"
+echo "  • Mimikatz:      /opt/mimikatz"
+echo "  • Airgeddon:     /opt/airgeddon"
+echo "  • SecLists:      /usr/share/seclists"
+echo "  • Wordlists:     /usr/share/wordlists"
+echo "  • RockYou:       /usr/share/wordlists/rockyou.txt"
+echo "  • Aliases:       ~/.security_aliases"
+echo ""
 warn "⚠️  CRITICAL REMINDERS:"
-echo
+echo ""
 echo "  1. ✅ ALWAYS get written authorization before testing"
 echo "  2. 🚫 NEVER use these tools on systems you don't own"
 echo "  3. 📜 Unauthorized access is ILLEGAL in most countries"
 echo "  4. 🎓 Use for learning in controlled lab environments"
-echo "  5. 🔥 IPTables rules active - traffic routed through Tor by default"
-echo "  6. 📖 Read tool documentation before use"
-echo
-info "🔄 Next Steps:"
+echo "  5. 📖 Read tool documentation before use"
+echo ""
+
+if [ "$iptables_level" == "3" ]; then
+    echo -e "${RED}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+    echo -e "${RED}${BOLD}║           🔥 FIREWALL IN STRICT MODE 🔥               ║${RESET}"
+    echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+    echo -e "${RED}${BOLD}║  All traffic is routed through Tor!                   ║${RESET}"
+    echo -e "${RED}${BOLD}║  Regular apps may not work properly.                  ║${RESET}"
+    echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+    echo -e "${RED}${BOLD}║  To disable: systemctl stop netfilter-persistent      ║${RESET}"
+    echo -e "${RED}${BOLD}║                                                       ║${RESET}"
+    echo -e "${RED}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+fi
+
+info "📄 Next Steps:"
 echo "  1. Restart your terminal to load aliases"
-echo "  2. Update Nuclei templates: nuclei -update-templates"
-echo "  3. Initialize Metasploit database: msfdb init"
-echo "  4. Test Tor connection: curl --socks5 127.0.0.1:9050 https://check.torproject.org"
-echo "  5. Review IPTables rules: iptables -L -v"
-echo
+echo "  2. Test Tor connection: curl --socks5 127.0.0.1:9050 https://check.torproject.org"
+echo "  3. Update Nuclei templates: nuclei -update-templates"
+echo "  4. Initialize Metasploit DB: msfdb init"
+echo "  5. Review firewall rules: iptables -L -v"
+echo ""
+info "🛠️  Manage IPTables:"
+echo "  • View rules:       iptables -L -v -n"
+echo "  • View IPv6:        ip6tables -L -v -n"
+echo "  • Restore backup:   iptables-restore < /etc/iptables/backups/rules.v4.backup.*"
+echo "  • Edit rules:       nano /etc/iptables/rules.v4"
+echo "  • Reload:           systemctl restart netfilter-persistent"
+echo "  • Disable firewall: systemctl stop netfilter-persistent"
+echo ""
 success "🎉 Happy (Ethical) Hacking!"
-echo
-section "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"

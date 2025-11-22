@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 #============================================================#
 #              Additional Applications Installer             #
-#               + Dynamic version fetching                   #
 #============================================================#
 
 set -e
@@ -13,12 +12,36 @@ BLUE="\033[1;34m"
 CYAN="\033[1;36m"
 MAGENTA="\033[1;35m"
 RESET="\033[0m"
+BOLD="\033[1m"
 
 info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
 success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
 section() { echo -e "${CYAN}┌── $1 ──┐${RESET}"; }
+
+# Ask user function
+ask_user() {
+    local prompt="$1"
+    local default="${2:-n}"
+    local response
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${YELLOW}${BOLD}❓ ${prompt}${RESET}"
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+    
+    if [[ "$default" == "y" ]]; then
+        read -rp "$(echo -e ${GREEN}👉 [Y/n]: ${RESET})" response
+    else
+        read -rp "$(echo -e ${YELLOW}👉 [y/N]: ${RESET})" response
+    fi
+    echo ""
+    
+    response=${response:-$default}
+    echo "${response,,}"
+}
 
 #==================#
 #   Require Root   #
@@ -30,14 +53,16 @@ if [ "$EUID" -ne 0 ]; then
     exec sudo bash "$0" "$@"
 fi
 
-# Get real user info
 REAL_USER=${SUDO_USER:-$USER}
 USER_HOME=$(eval echo ~$REAL_USER)
 
-echo "======================================"
-echo "      📦 Installing Applications"
-echo "======================================"
-echo
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║          📦 Installing Applications 📦                ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
 
 #==================#
 # Update System
@@ -84,11 +109,10 @@ if [ -d "$USER_HOME/.nvm" ]; then
 else
     info "Fetching latest nvm version..."
     
-    # Fetch latest version from GitHub API
     NVM_VERSION=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")' 2>/dev/null || echo "")
     
     if [ -z "$NVM_VERSION" ]; then
-        warn "Could not fetch latest version from API, using fallback v0.40.1"
+        warn "Could not fetch latest version, using fallback v0.40.1"
         NVM_VERSION="v0.40.1"
     else
         success "Latest nvm version: $NVM_VERSION"
@@ -96,7 +120,6 @@ else
     
     info "Installing nvm $NVM_VERSION for user $REAL_USER..."
     
-    # Download and install nvm as the real user
     sudo -u $REAL_USER bash <<NVMEOF
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh | bash
 NVMEOF
@@ -104,7 +127,6 @@ NVMEOF
     success "nvm installed"
     
     info "Installing Node.js 22..."
-    # Load nvm and install Node.js as the real user
     sudo -u $REAL_USER bash <<'NODEEOF'
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -115,7 +137,6 @@ NODEEOF
     
     success "Node.js 22 installed and set as default"
     
-    # Configure nvm in shell profiles
     for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
         if [ -f "$rc_file" ] && ! grep -q "NVM_DIR" "$rc_file"; then
             cat >> "$rc_file" <<'NVMRCEOF'
@@ -132,11 +153,11 @@ NVMRCEOF
 fi
 
 #==================#
-# LibreOffice (Optional)
+# LibreOffice
 #==================#
 section "LibreOffice Installation"
-read -rp "Install LibreOffice with Arabic support? (y/n): " install_libreoffice
-if [[ $install_libreoffice == [Yy]* ]]; then
+install_libreoffice=$(ask_user "Install LibreOffice with Arabic support?" "n")
+if [[ $install_libreoffice == "y" ]]; then
     info "Installing LibreOffice..."
     apt install -y libreoffice libreoffice-gtk3 libreoffice-l10n-ar
     success "LibreOffice installed (with Arabic support)"
@@ -160,11 +181,11 @@ else
 fi
 
 #==================#
-# AnyDesk (Optional)
+# AnyDesk
 #==================#
 section "AnyDesk Installation"
-read -rp "Install AnyDesk (remote desktop)? (y/n): " install_anydesk
-if [[ $install_anydesk == [Yy]* ]]; then
+install_anydesk=$(ask_user "Install AnyDesk (remote desktop)?" "n")
+if [[ $install_anydesk == "y" ]]; then
     if command -v anydesk &> /dev/null; then
         warn "AnyDesk already installed, skipping..."
     else
@@ -180,11 +201,11 @@ else
 fi
 
 #==================#
-# Discord (Optional)
+# Discord
 #==================#
 section "Discord Installation"
-read -rp "Install Discord? (y/n): " install_discord
-if [[ $install_discord == [Yy]* ]]; then
+install_discord=$(ask_user "Install Discord?" "n")
+if [[ $install_discord == "y" ]]; then
     if command -v discord &> /dev/null; then
         warn "Discord already installed, skipping..."
     else
@@ -200,25 +221,11 @@ else
 fi
 
 #==================#
-# GParted
+# Essential Apps
 #==================#
-section "Installing GParted"
-apt install -y gparted
-success "GParted installed"
-
-#==================#
-# Btop
-#==================#
-section "Installing Btop"
-apt install -y btop
-success "Btop installed"
-
-#==================#
-# VLC Media Player
-#==================#
-section "Installing VLC Media Player"
-apt install -y vlc
-success "VLC installed"
+section "Installing Essential Applications"
+apt install -y gparted btop vlc
+success "GParted, Btop, and VLC installed"
 
 #==================#
 # Wireshark
@@ -248,7 +255,7 @@ if [ "$EDITOR_INSTALLED" = false ]; then
     apt install -y mousepad
     success "Mousepad installed"
 else
-    info "Text editor already available, skipping installation"
+    info "Text editor already available"
 fi
 
 #==================#
@@ -288,7 +295,6 @@ if [ -d "/opt/tor-browser" ]; then
 else
     apt install -y libdbus-glib-1-2 libgtk-3-0
     
-    # Get latest version dynamically
     info "Fetching latest Tor Browser version..."
     TOR_VERSION=$(curl -s https://www.torproject.org/download/ | grep -oP 'torbrowser/\K[0-9.]+' | head -1 2>/dev/null || echo "")
     
@@ -359,7 +365,7 @@ fi
 success "pipx configured"
 
 #==================#
-# Figlet (for banner)
+# Figlet
 #==================#
 section "Installing Figlet"
 apt install -y figlet
@@ -418,58 +424,37 @@ fi
 #==================#
 # Summary
 #==================#
-echo
-echo "======================================"
-success "✅ All applications installed!"
-echo "======================================"
-echo
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║         ✅ All Applications Installed! ✅             ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
 info "📋 Installed applications:"
 echo "  ✓ Brave Browser"
 echo "  ✓ VS Code"
-echo "  ✓ Node.js 22 (via nvm - latest version)"
-if [[ $install_libreoffice == [Yy]* ]]; then
-    echo "  ✓ LibreOffice (with Arabic support)"
+echo "  ✓ Node.js 22 (via nvm)"
+if [[ $install_libreoffice == "y" ]]; then
+    echo "  ✓ LibreOffice (with Arabic)"
 fi
 echo "  ✓ Spotify"
-if [[ $install_anydesk == [Yy]* ]]; then
+if [[ $install_anydesk == "y" ]]; then
     echo "  ✓ AnyDesk"
 fi
-if [[ $install_discord == [Yy]* ]]; then
+if [[ $install_discord == "y" ]]; then
     echo "  ✓ Discord"
 fi
-echo "  ✓ GParted"
-echo "  ✓ Btop"
-echo "  ✓ VLC Media Player"
+echo "  ✓ GParted, Btop, VLC"
 echo "  ✓ Wireshark"
-echo "  ✓ Text Editor"
-echo "  ✓ Proxychains-ng (dynamic_chain)"
-echo "  ✓ Tor Service (running)"
-echo "  ✓ Tor Browser (latest version)"
+echo "  ✓ Proxychains-ng"
+echo "  ✓ Tor Service + Browser"
 echo "  ✓ OpenVPN"
-echo "  ✓ Python3 + pip + pipx"
+echo "  ✓ Python3 + pipx"
 echo "  ✓ Figlet"
-echo "  ✓ Golang (latest version)"
-echo
-info "🎨 Customization:"
-echo "  • Zsh configuration will be handled by zshrc.sh script"
-echo "  • Custom banner available via figlet"
-echo
-info "🔧 Services status:"
-echo "  • Tor: $(systemctl is-active tor)"
-echo
-warn "⚠️  Important Notes:"
-echo "  1. Restart your terminal to see all changes"
-echo "  2. Node.js 22 available via nvm (use: nvm use 22)"
-echo "  3. User '$REAL_USER' added to wireshark group (requires logout)"
-echo "  4. Apache2 NOT installed (use XAMPP for web server)"
-echo "  5. Oh My Zsh will be configured by zshrc.sh script"
-echo "  6. All tools fetched latest versions dynamically"
-echo
-info "🚀 Quick commands:"
-echo "  • Node.js: nvm use 22 && node --version"
-echo "  • Spotify: spotify"
-echo "  • Tor Browser: /opt/tor-browser/Browser/start-tor-browser"
-echo "  • Proxychains: proxychains4 <command>"
-echo "  • OpenVPN: openvpn --config <file.ovpn>"
-echo "  • Wireshark: wireshark"
-echo
+echo "  ✓ Golang"
+echo ""
+warn "⚠️  Important:"
+echo "  • Restart terminal for changes"
+echo "  • User '$REAL_USER' needs logout for wireshark group"
+echo ""

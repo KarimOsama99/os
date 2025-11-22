@@ -1,41 +1,78 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+YELLOW="\033[1;33m"
+BLUE="\033[1;34m"
+CYAN="\033[1;36m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+info()    { echo -e "${BLUE}[INFO]${RESET} $1"; }
+success() { echo -e "${GREEN}[OK]${RESET} $1"; }
+warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
+error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
+
 # Check dependencies
 for cmd in curl tar; do
   if ! command -v "$cmd" &> /dev/null; then
-    echo "❌ Missing dependency: $cmd"
+    error "Missing dependency: $cmd"
     echo "Install with: sudo apt install curl tar"
     exit 1
   fi
 done
 
-CURSOR_DIR="$HOME/.local/share/icons"
-mkdir -p "$CURSOR_DIR"
+# Install to BOTH locations for maximum compatibility
+CURSOR_DIR_USER="$HOME/.local/share/icons"
+CURSOR_DIR_SYSTEM="/usr/share/icons"
+mkdir -p "$CURSOR_DIR_USER"
 
 # Available styles and colors
 STYLES=("Modern" "Original")
 COLORS=("Amber" "Classic" "Ice")
 
-echo "🖱️  Bibata Cursor Theme Installer"
-echo "================================="
-echo
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║       🖱️  Bibata Cursor Theme Installer 🖱️           ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
+
+# Function to ask user
+ask_user() {
+    local prompt="$1"
+    local response
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${YELLOW}${BOLD}❓ ${prompt}${RESET}"
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+    read -rp "👉 Your choice: " response
+    echo ""
+    
+    echo "$response"
+}
 
 # Step 1: Choose style
-echo "Choose a style:"
+echo -e "${GREEN}${BOLD}📋 Available Styles:${RESET}"
+echo ""
 for i in "${!STYLES[@]}"; do
-  printf "%2d) %s\n" $((i+1)) "${STYLES[$i]}"
+  echo -e "  ${GREEN}$((i+1)))${RESET} ${STYLES[$i]}"
 done
-printf "%2d) Install ALL themes\n" $((${#STYLES[@]}+1))
+echo -e "  ${GREEN}$((${#STYLES[@]}+1)))${RESET} ${BOLD}Install ALL themes${RESET}"
+echo ""
+
 ALL_OPTION=$((${#STYLES[@]}+1))
 
-read -rp "Style number: " SN
+SN=$(ask_user "Choose style number [1-${ALL_OPTION}]")
 
 if [[ "$SN" == "$ALL_OPTION" ]]; then
-  echo "🎯 Installing ALL Bibata cursor themes..."
-  echo
+  echo -e "${CYAN}${BOLD}🎯 Installing ALL Bibata cursor themes...${RESET}"
+  echo ""
   
-  # Download all combinations
   declare -a ALL_THEMES=(
     "Bibata-Modern-Amber"
     "Bibata-Modern-Classic" 
@@ -47,132 +84,186 @@ if [[ "$SN" == "$ALL_OPTION" ]]; then
   
   success_count=0
   for theme in "${ALL_THEMES[@]}"; do
-    echo "📥 Downloading $theme..."
+    echo -e "${BLUE}📥 Downloading ${theme}...${RESET}"
     
     TEMP_DIR="/tmp/bibata-${theme}-$$"
     mkdir -p "$TEMP_DIR"
     
-    # Try to download from GitHub releases
     URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/${theme}.tar.xz"
     
     if curl -L -o "$TEMP_DIR/${theme}.tar.xz" "$URL" --progress-bar --fail; then
-      echo "📦 Extracting $theme..."
+      echo -e "${BLUE}📦 Extracting ${theme}...${RESET}"
       cd "$TEMP_DIR"
       
       if tar -xf "${theme}.tar.xz"; then
-        # Find extracted directory
         EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "*Bibata*" | head -1)
         
         if [[ -n "$EXTRACTED_DIR" ]]; then
-          DEST_DIR="$CURSOR_DIR/$theme"
+          # Install to user directory
+          DEST_DIR_USER="$CURSOR_DIR_USER/$theme"
+          if [[ -d "$DEST_DIR_USER" ]]; then
+            rm -rf "$DEST_DIR_USER"
+          fi
+          cp -r "$EXTRACTED_DIR" "$DEST_DIR_USER"
           
-          if [[ -d "$DEST_DIR" ]]; then
-            rm -rf "$DEST_DIR"
+          # Install to system directory (with sudo)
+          if [ "$EUID" -eq 0 ]; then
+            DEST_DIR_SYSTEM="$CURSOR_DIR_SYSTEM/$theme"
+            if [[ -d "$DEST_DIR_SYSTEM" ]]; then
+              rm -rf "$DEST_DIR_SYSTEM"
+            fi
+            cp -r "$EXTRACTED_DIR" "$DEST_DIR_SYSTEM"
+          else
+            sudo cp -r "$EXTRACTED_DIR" "$CURSOR_DIR_SYSTEM/$theme" 2>/dev/null || warn "Could not install to system directory (needs sudo)"
           fi
           
-          mv "$EXTRACTED_DIR" "$DEST_DIR"
-          echo "✅ Installed: $theme"
+          success "Installed: ${theme}"
           ((success_count++))
         else
-          echo "❌ Could not find extracted directory for $theme"
+          error "Could not find extracted directory for ${theme}"
         fi
       else
-        echo "❌ Failed to extract $theme"
+        error "Failed to extract ${theme}"
       fi
     else
-      echo "❌ Failed to download $theme"
+      error "Failed to download ${theme}"
     fi
     
     rm -rf "$TEMP_DIR"
-    echo
   done
   
-  echo "🎉 Installation complete!"
-  echo "   Successfully installed: $success_count/${#ALL_THEMES[@]} themes"
+  echo ""
+  echo -e "${GREEN}${BOLD}🎉 Installation complete!${RESET}"
+  echo -e "   Successfully installed: ${BOLD}${success_count}/${#ALL_THEMES[@]}${RESET} themes"
   
 else
   # Single theme selection
   if [[ "$SN" -lt 1 ]] || [[ "$SN" -gt ${#STYLES[@]} ]]; then
-    echo "❌ Invalid style selection"
+    error "Invalid style selection"
     exit 1
   fi
   
   STYLE="${STYLES[$((SN-1))]}"
-  echo
   
   # Step 2: Choose color
-  echo "Choose a color:"
+  echo -e "${GREEN}${BOLD}🎨 Available Colors:${RESET}"
+  echo ""
   for i in "${!COLORS[@]}"; do
-    printf "%2d) %s\n" $((i+1)) "${COLORS[$i]}"
+    echo -e "  ${GREEN}$((i+1)))${RESET} ${COLORS[$i]}"
   done
-  read -rp "Color number: " CN
+  echo ""
+  
+  CN=$(ask_user "Choose color number [1-${#COLORS[@]}]")
   
   if [[ "$CN" -lt 1 ]] || [[ "$CN" -gt ${#COLORS[@]} ]]; then
-    echo "❌ Invalid color selection"
+    error "Invalid color selection"
     exit 1
   fi
   
   COLOR="${COLORS[$((CN-1))]}"
-  echo
   
   # Step 3: Download and install
   THEME_NAME="Bibata-${STYLE}-${COLOR}"
-  echo "📥 Downloading $THEME_NAME..."
+  echo -e "${BLUE}📥 Downloading ${THEME_NAME}...${RESET}"
   
   TEMP_DIR="/tmp/bibata-${THEME_NAME}-$$"
   mkdir -p "$TEMP_DIR"
   
-  # Download from GitHub releases
   URL="https://github.com/ful1e5/Bibata_Cursor/releases/latest/download/${THEME_NAME}.tar.xz"
   
   if ! curl -L -o "$TEMP_DIR/${THEME_NAME}.tar.xz" "$URL" --progress-bar --fail; then
-    echo "❌ Failed to download $THEME_NAME"
+    error "Failed to download ${THEME_NAME}"
     echo "   URL: $URL"
     rm -rf "$TEMP_DIR"
     exit 1
   fi
   
-  echo "📦 Extracting $THEME_NAME..."
+  echo -e "${BLUE}📦 Extracting ${THEME_NAME}...${RESET}"
   cd "$TEMP_DIR"
   
   if ! tar -xf "${THEME_NAME}.tar.xz"; then
-    echo "❌ Failed to extract $THEME_NAME"
+    error "Failed to extract ${THEME_NAME}"
     rm -rf "$TEMP_DIR"
     exit 1
   fi
   
-  # Find extracted directory
   EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "*Bibata*" | head -1)
   
   if [[ -z "$EXTRACTED_DIR" ]]; then
-    echo "❌ Could not find extracted theme directory"
+    error "Could not find extracted theme directory"
     rm -rf "$TEMP_DIR"
     exit 1
   fi
   
-  # Install theme
-  DEST_DIR="$CURSOR_DIR/$THEME_NAME"
+  # Install to user directory
+  DEST_DIR_USER="$CURSOR_DIR_USER/$THEME_NAME"
+  if [[ -d "$DEST_DIR_USER" ]]; then
+    warn "Overwriting existing theme: ${THEME_NAME}"
+    rm -rf "$DEST_DIR_USER"
+  fi
+  cp -r "$EXTRACTED_DIR" "$DEST_DIR_USER"
   
-  if [[ -d "$DEST_DIR" ]]; then
-    echo "⚠️  Overwriting existing theme: $THEME_NAME"
-    rm -rf "$DEST_DIR"
+  # Install to system directory
+  if [ "$EUID" -eq 0 ]; then
+    DEST_DIR_SYSTEM="$CURSOR_DIR_SYSTEM/$THEME_NAME"
+    if [[ -d "$DEST_DIR_SYSTEM" ]]; then
+      rm -rf "$DEST_DIR_SYSTEM"
+    fi
+    cp -r "$EXTRACTED_DIR" "$DEST_DIR_SYSTEM"
+  else
+    sudo cp -r "$EXTRACTED_DIR" "$CURSOR_DIR_SYSTEM/$THEME_NAME" 2>/dev/null || warn "Could not install to system directory"
   fi
   
-  mv "$EXTRACTED_DIR" "$DEST_DIR"
+  success "Theme '${THEME_NAME}' installed!"
   
-  echo "✅ Done! Theme '$THEME_NAME' installed to:"
-  echo "   $DEST_DIR"
-  
-  # Cleanup
   rm -rf "$TEMP_DIR"
 fi
 
-echo
-echo "📝 Next steps:"
-echo "1. Open your system settings"
-echo "2. Go to Mouse & Touchpad (or Appearance) settings" 
-echo "3. Select your new Bibata cursor theme"
-echo "4. Log out and back in if the cursors don't change immediately"
-echo
-echo "🎨 Cursor themes are installed in:"
-echo "   $CURSOR_DIR"
+# CRITICAL: Refresh icon cache
+echo ""
+info "Refreshing icon cache..."
+gtk-update-icon-cache -f "$CURSOR_DIR_USER" 2>/dev/null || true
+if [ "$EUID" -eq 0 ]; then
+    gtk-update-icon-cache -f "$CURSOR_DIR_SYSTEM" 2>/dev/null || true
+else
+    sudo gtk-update-icon-cache -f "$CURSOR_DIR_SYSTEM" 2>/dev/null || true
+fi
+success "Icon cache refreshed"
+
+# Set default cursor theme (optional)
+echo ""
+DEFAULT_THEME=$(ask_user "Set Bibata-Modern-Classic as default cursor? (y/n)")
+if [[ "$DEFAULT_THEME" =~ ^[Yy]$ ]]; then
+    mkdir -p "$HOME/.icons/default"
+    cat > "$HOME/.icons/default/index.theme" <<EOF
+[Icon Theme]
+Name=Default
+Comment=Default Cursor Theme
+Inherits=Bibata-Modern-Classic
+EOF
+    success "Default cursor theme set to Bibata-Modern-Classic"
+fi
+
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║            ✅ Installation Complete! ✅               ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
+echo -e "${GREEN}${BOLD}📍 Next steps:${RESET}"
+echo ""
+echo "  1️⃣  Open your system settings"
+echo "  2️⃣  Go to: ${BOLD}Appearance → Cursor Theme${RESET}"
+echo "     Or: ${BOLD}Mouse & Touchpad → Cursor Theme${RESET}"
+echo "  3️⃣  Select your new Bibata cursor"
+echo "  4️⃣  Log out and back in if needed"
+echo ""
+echo -e "${BLUE}📂 Cursor themes installed in:${RESET}"
+echo "  • $CURSOR_DIR_USER"
+echo "  • $CURSOR_DIR_SYSTEM"
+echo ""
+echo -e "${YELLOW}💡 Tip: If cursors don't appear immediately:${RESET}"
+echo "  • Run: ${CYAN}gsettings set org.gnome.desktop.interface cursor-theme 'Bibata-Modern-Classic'${RESET}"
+echo "  • Or restart your desktop environment"
+echo ""

@@ -21,7 +21,6 @@ SCRIPTS_DIR="$SCRIPT_DIR/scripts"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/installation_$(date +%Y%m%d_%H%M%S).log"
 
-# Create logs directory
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 
 # --- Command line arguments ---
@@ -48,14 +47,14 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  -m, --manual       Manual mode: Ask for confirmation for each script (default)"
-            echo "  -y, --yes, --auto  Auto mode: Install all scripts with default 'Y' without asking"
+            echo "  -m, --manual       Manual mode: Ask for confirmation (default)"
+            echo "  -y, --yes, --auto  Auto mode: Install all with defaults"
             echo "  --skip <script>    Skip specific script"
-            echo "  -h, --help         Show this help message"
+            echo "  -h, --help         Show this help"
             echo ""
             echo "Examples:"
             echo "  $0                                    # Manual mode"
-            echo "  $0 --auto                             # Auto install everything"
+            echo "  $0 --auto                             # Auto install"
             echo "  $0 --skip installSecurityTools.sh     # Skip security tools"
             exit 0
             ;;
@@ -74,7 +73,37 @@ log() {
     echo "$msg" >> "$LOG_FILE" 2>/dev/null || true
 }
 
-# --- Ordered list: "script|description|default"
+# --- Ask user function with clear prompt ---
+ask_user() {
+    local script_name="$1"
+    local description="$2"
+    local default="$3"
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${CYAN}${BOLD}║                                                               ║${RESET}"
+    echo -e "${CYAN}${BOLD}║  📦 ${script_name}${RESET}"
+    echo -e "${CYAN}${BOLD}║  📝 ${description}${RESET}"
+    echo -e "${CYAN}${BOLD}║                                                               ║${RESET}"
+    echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    
+    local prompt="👉 Run this script? "
+    if [[ "$default" == "Y" ]]; then
+        prompt="${prompt}${GREEN}[Y/n]${RESET}: "
+    else
+        prompt="${prompt}${YELLOW}[y/N]${RESET}: "
+    fi
+    
+    read -rp "$(echo -e $prompt)" response
+    echo ""
+    
+    response=${response:-$default}
+    echo "${response^^}"
+}
+
+# --- Ordered list: "script|description|default" ---
+# ⚠️ FIXED ORDER: System → Themes → Apps → Shell → Boot (Plymouth/GRUB last!)
 SCRIPTS=(
     "systemUpdate.sh|Update system and install base tools|Y"
     "installFonts.sh|Install system fonts|Y"
@@ -134,7 +163,7 @@ echo -e "${RESET}\n"
 sleep 1
 
 # --- Header Info ---
-echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════════════════${RESET}"
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "${BLUE}📁 Script Directory: ${BOLD}${SCRIPT_DIR}${RESET}"
 echo -e "${BLUE}📝 Log File: ${BOLD}${LOG_FILE}${RESET}"
 echo -e "${BLUE}📊 Total Scripts: ${BOLD}${TOTAL_SCRIPTS}${RESET}"
@@ -145,7 +174,7 @@ else
     echo -e "${YELLOW}👤 Mode: ${BOLD}MANUAL${RESET} ${YELLOW}(Asking for confirmation)${RESET}"
 fi
 
-echo -e "${CYAN}${BOLD}════════════════════════════════════════════════════════════════${RESET}\n"
+echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
 
 log "=== WOLF OS Installation started ==="
 log "Mode: $MODE"
@@ -164,7 +193,7 @@ for ENTRY in "${SCRIPTS[@]}"; do
     
     CURRENT_SCRIPT=$((CURRENT_SCRIPT + 1))
     
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo -e "${YELLOW}${BOLD}▶ [$CURRENT_SCRIPT/$TOTAL_SCRIPTS] ${SCRIPT}${RESET}"
     echo -e "   ${BLUE}${DESC}${RESET}"
     
@@ -177,7 +206,7 @@ for ENTRY in "${SCRIPTS[@]}"; do
     done
     
     if [ "$SHOULD_SKIP" = true ]; then
-        echo -e "${YELLOW}   ⚠  Skipped (--skip flag)${RESET}\n"
+        echo -e "${YELLOW}   ⊘   Skipped (--skip flag)${RESET}\n"
         log "SKIP: $SCRIPT (via --skip flag)"
         SKIPPED_SCRIPTS+=("$SCRIPT")
         SKIPPED=$((SKIPPED + 1))
@@ -201,17 +230,12 @@ for ENTRY in "${SCRIPTS[@]}"; do
         else
             echo -e "${YELLOW}   ⊘ Auto-skipping (default: No)${RESET}"
         fi
+        echo ""
     else
-        PROMPT="   ➤ Run this script? (y/N): "
-        [ "$DEFAULT" == "Y" ] && PROMPT="   ➤ Run this script? (Y/n): "
-        
-        read -rp "$PROMPT" USER_INPUT
-        ANSWER=${USER_INPUT:-$DEFAULT}
+        ANSWER=$(ask_user "$SCRIPT" "$DESC" "$DEFAULT")
     fi
-    
-    echo
 
-    case "${ANSWER^^}" in
+    case "${ANSWER}" in
         Y)
             echo -e "${GREEN}   ⏳ Running $SCRIPT...${RESET}"
             log "START: $SCRIPT"
@@ -239,19 +263,26 @@ for ENTRY in "${SCRIPTS[@]}"; do
                 FAILED=$((FAILED + 1))
                 
                 if [ "$MODE" = "manual" ]; then
-                    read -rp "Continue with remaining scripts? (Y/n): " CONTINUE
+                    echo ""
+                    echo -e "${YELLOW}${BOLD}╔═══════════════════════════════════════╗${RESET}"
+                    echo -e "${YELLOW}${BOLD}║  ⚠️  Script Failed!                  ║${RESET}"
+                    echo -e "${YELLOW}${BOLD}╚═══════════════════════════════════════╝${RESET}"
+                    echo ""
+                    read -rp "$(echo -e ${YELLOW}Continue with remaining scripts? [Y/n]: ${RESET})" CONTINUE
+                    echo ""
+                    
                     if [[ $CONTINUE =~ ^[Nn]$ ]]; then
                         echo -e "${RED}Installation aborted by user${RESET}"
                         log "Installation aborted by user after $SCRIPT failed"
                         exit 1
                     fi
                 else
-                    echo -e "${YELLOW}   ⚠  Continuing in auto mode...${RESET}\n"
+                    echo -e "${YELLOW}   ⚠   Continuing in auto mode...${RESET}\n"
                 fi
             fi
             ;;
         *)
-            echo -e "${YELLOW}   ⚠  Skipped: $SCRIPT${RESET}\n"
+            echo -e "${YELLOW}   ⊘   Skipped: $SCRIPT${RESET}\n"
             log "SKIP: $SCRIPT (user choice or default)"
             SKIPPED_SCRIPTS+=("$SCRIPT")
             SKIPPED=$((SKIPPED + 1))
@@ -273,7 +304,7 @@ echo -e "${RESET}\n"
 echo -e "${BLUE}Total Scripts:     ${BOLD}${TOTAL_SCRIPTS}${RESET}"
 echo -e "${GREEN}✅ Successful:     ${BOLD}${SUCCESSFUL}${RESET}"
 echo -e "${RED}✖  Failed:         ${BOLD}${FAILED}${RESET}"
-echo -e "${YELLOW}⚠  Skipped:        ${BOLD}${SKIPPED}${RESET}\n"
+echo -e "${YELLOW}⊘   Skipped:        ${BOLD}${SKIPPED}${RESET}\n"
 
 if [ ${#SUCCESS_SCRIPTS[@]} -gt 0 ]; then
     echo -e "${GREEN}${BOLD}✅ Successful Scripts:${RESET}"
@@ -292,9 +323,9 @@ if [ ${#FAILED_SCRIPTS[@]} -gt 0 ]; then
 fi
 
 if [ ${#SKIPPED_SCRIPTS[@]} -gt 0 ]; then
-    echo -e "${YELLOW}${BOLD}⚠ Skipped Scripts:${RESET}"
+    echo -e "${YELLOW}${BOLD}⊘  Skipped Scripts:${RESET}"
     for script in "${SKIPPED_SCRIPTS[@]}"; do
-        echo -e "  ${YELLOW}⚠${RESET} $script"
+        echo -e "  ${YELLOW}⊘ ${RESET} $script"
     done
     echo
 fi
@@ -307,13 +338,13 @@ echo -e "${BLUE}📝 Full log saved to: ${BOLD}${LOG_FILE}${RESET}\n"
 if [ $FAILED -eq 0 ]; then
     echo -e "${GREEN}${BOLD}"
     cat << "EOF"
-        ╔════════════════════════════════════════════════════════╗
-        ║                                                        ║
-        ║      🎉  All tasks completed successfully!  🎉         ║
-        ║                                                        ║
-        ║          Your WOLF OS is ready to unleash! 🐺          ║
-        ║                                                        ║
-        ╚════════════════════════════════════════════════════════╝
+        ╔════════════════════════════════════════════════════╗
+        ║                                                    ║
+        ║      🎉  All tasks completed successfully!  🎉     ║
+        ║                                                    ║
+        ║          Your WOLF OS is ready to unleash! 🐺      ║
+        ║                                                    ║
+        ╚════════════════════════════════════════════════════╝
 EOF
     echo -e "${RESET}\n"
     echo -e "${YELLOW}⚠️  Please ${BOLD}reboot${RESET}${YELLOW} your system to apply all changes${RESET}\n"
@@ -329,11 +360,11 @@ EOF
 else
     echo -e "${RED}${BOLD}"
     cat << "EOF"
-        ╔════════════════════════════════════════════════════════╗
-        ║                                                        ║
-        ║      ⚠️  Installation completed with errors  ⚠️       ║
-        ║                                                        ║
-        ╚════════════════════════════════════════════════════════╝
+        ╔════════════════════════════════════════════════════╗
+        ║                                                    ║
+        ║      ⚠️  Installation completed with errors  ⚠️     ║
+        ║                                                    ║
+        ╚════════════════════════════════════════════════════╝
 EOF
     echo -e "${RESET}\n"
     echo -e "${YELLOW}📋 Check the log file for details: ${BOLD}${LOG_FILE}${RESET}\n"

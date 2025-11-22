@@ -20,6 +20,23 @@ success() { echo -e "${GREEN}[OK]${RESET} $1"; }
 warn()    { echo -e "${YELLOW}[WARN]${RESET} $1"; }
 error()   { echo -e "${RED}[ERROR]${RESET} $1"; }
 
+# Function to ask user with clear prompt
+ask_user() {
+    local prompt="$1"
+    local default="${2:-}"
+    local response
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${YELLOW}${BOLD}❓ ${prompt}${RESET}"
+    echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo ""
+    read -rp "👉 Your choice: " response
+    echo ""
+    
+    echo "${response:-$default}"
+}
+
 #==================#
 #   Get User Info  #
 #==================#
@@ -78,7 +95,7 @@ fi
 ASCII_DIR="$NEOFETCH_CONFIG/ascii"
 mkdir -p "$ASCII_DIR"
 
-# Wolf ASCII Art (Braille - رسمة الذئب بالنقاط)
+# Wolf ASCII Art (Braille)
 cat > "$ASCII_DIR/wolf.txt" << 'WOLFEOF'
 ${c1}⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ${c2}⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⠁⠸⢳⡄⠀⠀⠀⠀⠀⠀⠀⠀
@@ -100,7 +117,7 @@ ${c5}⠀⠀⠀⠀⡇⣿⡅⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠦⠀⠀⠀⠀⠀⠀
 ${c6}⠀⠀⠀⠀⠁⠛⠓⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠼⠇⠁
 WOLFEOF
 
-# Wolf Text Art (الكتابة)
+# Wolf Text Art
 cat > "$ASCII_DIR/wolf-text.txt" << 'WOLFTEXTEOF'
 ${c1} ██╗    ██╗ ██████╗ ██╗     ███████╗
 ${c2} ██║    ██║██╔═══██╗██║     ██╔════╝
@@ -132,7 +149,6 @@ print_info() {
     info title
     info underline
     
-    # عرض معلومات WOLF OS
     prin "OS" "WOLF OS"
     
     info "Host" model
@@ -155,88 +171,52 @@ print_info() {
     info cols
 }
 
-# Title
 title_fqdn="off"
-
-# Kernel
 kernel_shorthand="on"
-
-# Distro
 distro_shorthand="off"
 os_arch="on"
-
-# Uptime
 uptime_shorthand="on"
-
-# Memory
 memory_percent="on"
 memory_unit="gib"
-
-# Packages
 package_managers="on"
-
-# Shell
 shell_path="off"
 shell_version="on"
-
-# CPU
 speed_type="bios_limit"
 speed_shorthand="on"
 cpu_brand="on"
 cpu_speed="on"
 cpu_cores="logical"
 cpu_temp="off"
-
-# GPU
 gpu_brand="on"
 gpu_type="all"
-
-# Resolution
 refresh_rate="off"
-
-# Disk
 disk_show=('/')
 disk_subtitle="mount"
 disk_percent="on"
-
-# Text Colors
 colors=(distro)
-
-# Text Options
 bold="on"
 underline_enabled="on"
 underline_char="-"
 separator=":"
-
-# Color Blocks
 block_range=(0 15)
 color_blocks="on"
 block_width=3
 block_height=1
 col_offset="auto"
-
-# Progress Bars
 bar_char_elapsed="-"
 bar_char_total="="
 bar_border="on"
 bar_length=15
 bar_color_elapsed="distro"
 bar_color_total="distro"
-
 cpu_display="off"
 memory_display="bar"
 battery_display="off"
 disk_display="bar"
-
-# Backend Settings - CRITICAL: تعطيل auto detection
 image_backend="ascii"
-
-# ASCII - هنا الحل الأساسي
 ascii_distro="auto"
 ascii_colors=(1 2 3 4 5 6)
 ascii_bold="on"
-
-# Image Options
 image_loop="off"
 thumbnail_dir="${XDG_CACHE_HOME:-$HOME/.cache}/thumbnails/neofetch"
 crop_mode="normal"
@@ -246,58 +226,55 @@ gap=3
 yoffset=0
 xoffset=0
 background_color=
-
-# Misc
 stdout="off"
 CONFIGEOF
 
 chown $REAL_USER:$REAL_USER "$NEOFETCH_CONF_FILE"
 
 #===========================================#
-#   ASCII Art Selection (خيارين بس)       #
+#   ASCII Art Selection                    #
 #===========================================#
-echo
-echo -e "${CYAN}${BOLD}Choose WOLF OS ASCII art:${RESET}"
-echo
-echo "1) Wolf ASCII Art"
-echo "2) Wolf Text"
-echo
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                   ║${RESET}"
+echo -e "${CYAN}${BOLD}║       🎨 Choose WOLF OS ASCII Art Style 🎨       ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                   ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════╝${RESET}"
+echo ""
+echo -e "${GREEN}${BOLD}1)${RESET} Wolf ASCII Art ${YELLOW}(Braille dots - Detailed)${RESET}"
+echo -e "${GREEN}${BOLD}2)${RESET} Wolf Text Logo ${YELLOW}(Block letters - Bold)${RESET}"
+echo ""
 
-read -rp "Select [1-2]: " ascii_choice
+ascii_choice=$(ask_user "Select option [1-2]" "1")
 
 case $ascii_choice in
     1)
-        # Wolf ASCII (Braille)
         sed -i 's|^ascii_distro="auto"|ascii_distro="'"$ASCII_DIR/wolf.txt"'"|' "$NEOFETCH_CONF_FILE"
-        success "Wolf ASCII (Braille) enabled ✓"
+        success "✓ Wolf ASCII (Braille) enabled"
         ;;
     2)
-        # Wolf Text
         sed -i 's|^ascii_distro="auto"|ascii_distro="'"$ASCII_DIR/wolf-text.txt"'"|' "$NEOFETCH_CONF_FILE"
-        success "Wolf Text logo enabled ✓"
+        success "✓ Wolf Text logo enabled"
         ;;
     *)
-        # Default to Wolf ASCII
         sed -i 's|^ascii_distro="auto"|ascii_distro="'"$ASCII_DIR/wolf.txt"'"|' "$NEOFETCH_CONF_FILE"
         warn "Invalid choice, using Wolf ASCII by default"
         ;;
 esac
 
 #===========================================#
-#   إنشاء Wrapper Script (الحل النهائي)   #
+#   Create Wrapper Script                  #
 #===========================================#
-info "Creating neofetch wrapper to force WOLF OS ASCII..."
+info "Creating neofetch wrapper..."
 
 WRAPPER_SCRIPT="$USER_HOME/.local/bin/neofetch"
 mkdir -p "$USER_HOME/.local/bin"
 
 cat > "$WRAPPER_SCRIPT" << 'WRAPPEREOF'
 #!/usr/bin/env bash
-# WOLF OS Neofetch Wrapper - يجبر neofetch على استخدام التكوين الصحيح
+# WOLF OS Neofetch Wrapper
 
 CONFIG_FILE="$HOME/.config/neofetch/config.conf"
-
-# تشغيل neofetch مع التكوين المخصص
 /usr/bin/neofetch --config "$CONFIG_FILE" "$@"
 WRAPPEREOF
 
@@ -313,7 +290,6 @@ info "Ensuring ~/.local/bin is in PATH..."
 
 for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
     if [ -f "$rc_file" ]; then
-        # Check if PATH already includes ~/.local/bin
         if ! grep -q 'PATH.*\.local/bin' "$rc_file" 2>/dev/null; then
             cat >> "$rc_file" <<'PATHEOF'
 
@@ -327,30 +303,25 @@ PATHEOF
     fi
 done
 
-# Export for current session
 export PATH="$USER_HOME/.local/bin:$PATH"
-
 success "PATH configuration complete"
 
 #===========================================#
-#   Shell Integration (اختياري)           #
+#   Shell Integration                      #
 #===========================================#
-echo
-read -rp "Auto-run neofetch on shell startup? (y/n): " auto_run
+auto_run=$(ask_user "Auto-run neofetch on shell startup? (y/n)" "n")
 
 if [[ $auto_run == [Yy]* ]]; then
     for rc_file in "$USER_HOME/.bashrc" "$USER_HOME/.zshrc"; do
         if [ -f "$rc_file" ]; then
-            # حذف الإدخالات القديمة
             sed -i '/^neofetch$/d' "$rc_file" 2>/dev/null || true
             sed -i '/^# Run neofetch/d' "$rc_file" 2>/dev/null || true
             sed -i '/# WOLF OS neofetch/d' "$rc_file" 2>/dev/null || true
             
-            # إضافة إدخال جديد يستخدم الـ wrapper
             if ! grep -q "neofetch --config" "$rc_file" 2>/dev/null; then
                 cat >> "$rc_file" << 'AUTORUNEOF'
 
-# WOLF OS neofetch - استخدام التكوين المخصص
+# WOLF OS neofetch
 if command -v neofetch &> /dev/null && [[ $- == *i* ]]; then
     neofetch
 fi
@@ -358,90 +329,56 @@ AUTORUNEOF
             fi
         fi
     done
-    success "Auto-run configured (using wrapper)"
+    success "Auto-run configured"
+else
+    info "Skipped auto-run configuration"
 fi
 
 #===========================================#
-#   Test Configuration (اختبار)           #
+#   Test Configuration                     #
 #===========================================#
-echo
+echo ""
 info "Testing neofetch configuration..."
-echo
+echo ""
 
-# تأكد من أن PATH يتضمن ~/.local/bin
 export PATH="$USER_HOME/.local/bin:$PATH"
-
-# اختبر الـ wrapper
 sudo -u $REAL_USER bash -c "export PATH=\"$USER_HOME/.local/bin:\$PATH\"; neofetch" 2>/dev/null || {
-    warn "Could not test neofetch (this is normal if running via sudo)"
+    warn "Could not test neofetch (normal if running via sudo)"
 }
-
-#===========================================#
-#   Add neofetch alias (optional)          #
-#===========================================#
-info "Adding neofetch alias..."
-
-ALIAS_LINE="alias neofetch='neofetch --ascii \$HOME/.config/neofetch/ascii/wolf.txt'"
-
-for rc_file in "$USER_HOME/.zshrc" "$USER_HOME/.bashrc"; do
-    if [ -f "$rc_file" ]; then
-        # Remove old occurrences
-        sed -i "/alias neofetch=.*ascii/d" "$rc_file"
-        sed -i "/# WOLF OS neofetch alias/d" "$rc_file"
-
-        # Add the alias only if not exists
-        if ! grep -q "alias neofetch=" "$rc_file"; then
-            echo "" >> "$rc_file"
-            echo "# WOLF OS neofetch alias" >> "$rc_file"
-            echo "$ALIAS_LINE" >> "$rc_file"
-        fi
-    fi
-done
-
-success "Alias added successfully"
 
 #===========================================#
 #   Final Instructions                     #
 #===========================================#
-echo
-echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-success "✅ Neofetch configured successfully!"
-echo -e "${CYAN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo
-info "📋 What was configured:"
-echo
+echo ""
+echo -e "${CYAN}${BOLD}╔═══════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}║         ✅ Neofetch configured successfully!          ║${RESET}"
+echo -e "${CYAN}${BOLD}║                                                       ║${RESET}"
+echo -e "${CYAN}${BOLD}╚═══════════════════════════════════════════════════════╝${RESET}"
+echo ""
+echo -e "${GREEN}${BOLD}📋 What was configured:${RESET}"
+echo ""
 echo "  ✓ Neofetch installed and configured"
 echo "  ✓ WOLF OS custom ASCII art created"
 echo "  ✓ Custom config with 'WOLF OS (Debian 13)'"
-echo "  ✓ Wrapper script created to force correct ASCII"
+echo "  ✓ Wrapper script created"
 echo "  ✓ PATH includes ~/.local/bin"
-echo
-info "🎨 Your ASCII choice:"
+echo ""
+echo -e "${GREEN}${BOLD}🎨 Your ASCII choice:${RESET}"
 case $ascii_choice in
     1) echo "  ✓ Wolf ASCII (Braille art)" ;;
     2) echo "  ✓ Wolf Text logo" ;;
     *) echo "  ✓ Wolf ASCII (default)" ;;
 esac
-echo
-info "🚀 How to use:"
-echo
-echo "  Just run:  ${CYAN}neofetch${RESET}"
-echo
-echo "  The wrapper automatically uses your WOLF OS config!"
-echo
-info "🔧 Manual override (if needed):"
-echo
-echo "  Change ASCII:  Edit ${CYAN}~/.config/neofetch/config.conf${RESET}"
-echo "  Line to edit:  ${CYAN}ascii_distro=\"...\"${RESET}"
-echo
-echo "  Wolf ASCII:    ${CYAN}ascii_distro=\"$ASCII_DIR/wolf.txt\"${RESET}"
-echo "  Wolf Text:     ${CYAN}ascii_distro=\"$ASCII_DIR/wolf-text.txt\"${RESET}"
-echo
-warn "⚠️  Important:"
-echo
+echo ""
+echo -e "${GREEN}${BOLD}🚀 How to use:${RESET}"
+echo ""
+echo -e "  Just run:  ${CYAN}neofetch${RESET}"
+echo ""
+echo -e "${YELLOW}${BOLD}⚠️  Important:${RESET}"
+echo ""
 echo "  • Restart your terminal for changes to take effect"
-echo "  • The wrapper at ~/.local/bin/neofetch overrides system neofetch"
-echo "  • If you want system neofetch: /usr/bin/neofetch"
-echo
+echo "  • The wrapper overrides system neofetch"
+echo ""
 success "🐺 Enjoy your WOLF OS neofetch!"
-echo
+echo ""
